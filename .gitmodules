@@ -1,0 +1,3 @@
+[submodule "rfcl-jax"]
+	path = rfcl-jax
+	url = https://github.com/StoneT2000/rfcl.git
