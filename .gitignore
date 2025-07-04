@@ -1,0 +1,120 @@
+# -------------------------------
+# Python
+# -------------------------------
+__pycache__/
+*.py[cod]
+*.pyo
+*.pyd
+*.so
+*.egg
+*.egg-info/
+dist/
+build/
+.eggs/
+pip-wheel-metadata/
+
+# -------------------------------
+# Virtual Environments
+# -------------------------------
+venv/
+.venv/
+env/
+.env/
+ENV/
+env.bak/
+venv.bak/
+
+# -------------------------------
+# Jupyter Notebooks
+# -------------------------------
+.ipynb_checkpoints/
+
+# -------------------------------
+# PyTorch
+# -------------------------------
+*.pt
+*.pth
+*.ckpt
+*.pkl
+*.onnx
+
+# -------------------------------
+# JAX
+# -------------------------------
+__jax_cache__/
+
+# -------------------------------
+# Data, Models, Outputs (optional)
+# -------------------------------
+checkpoints/
+outputs/
+runs/
+data/
+datasets/
+models/
+results/
+*.csv
+*.tsv
+*.h5
+*.npy
+*.npz
+*.pdb
+*.mat
+
+# -------------------------------
+# Coverage & Test Reports
+# -------------------------------
+htmlcov/
+.coverage
+coverage.xml
+.cache
+nosetests.xml
+*.cover
+test-output/
+junit-*.xml
+
+# -------------------------------
+# Type Checking Tools
+# -------------------------------
+.mypy_cache/
+.pytype/
+.pyre/
+.typing/
+
+# -------------------------------
+# Logs and Temporary Files
+# -------------------------------
+*.log
+*.tmp
+*.bak
+*.swp
+*.swo
+
+# -------------------------------
+# macOS Specific
+# -------------------------------
+.DS_Store
+
+# -------------------------------
+# Windows Specific
+# -------------------------------
+Thumbs.db
+ehthumbs.db
+desktop.ini
+$RECYCLE.BIN/
+
+# -------------------------------
+# VS Code
+# -------------------------------
+.vscode/
+.code-workspace
+
+# -------------------------------
+# PyCharm
+# -------------------------------
+.idea/
+
+# -------------------------------
+# Optional: Weights & Biases (if used)
+# -------------------------------
+wandb/
