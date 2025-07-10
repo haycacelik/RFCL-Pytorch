@@ -1,0 +1,329 @@
+{
+  "env_info": {
+    "env_id": "door-open-v2-goal-observable",
+    "max_episode_steps": 200,
+    "env_kwargs": {}
+  },
+  "episodes": [
+    {
+      "episode_id": 0,
+      "reset_kwargs": {
+        "seed": 0
+      },
+      "elapsed_steps": 79,
+      "info": {
+        "success": true,
+        "near_object": 1.0,
+        "grasp_success": true,
+        "grasp_reward": 1.0,
+        "in_place_reward": 0.8076500969334857,
+        "obj_to_target": 0,
+        "unscaled_reward": 10.0
+      }
+    },
+    {
+      "episode_id": 1,
+      "reset_kwargs": {
+        "seed": 1
+      },
+      "elapsed_steps": 81,
+      "info": {
+        "success": true,
+        "near_object": 1.0,
+        "grasp_success": true,
+        "grasp_reward": 1.0,
+        "in_place_reward": 0.8126871407653848,
+        "obj_to_target": 0,
+        "unscaled_reward": 10.0
+      }
+    },
+    {
+      "episode_id": 2,
+      "reset_kwargs": {
+        "seed": 2
+      },
+      "elapsed_steps": 84,
+      "info": {
+        "success": true,
+        "near_object": 1.0,
+        "grasp_success": true,
+        "grasp_reward": 1.0,
+        "in_place_reward": 0.8090200097801643,
+        "obj_to_target": 0,
+        "unscaled_reward": 10.0
+      }
+    },
+    {
+      "episode_id": 3,
+      "reset_kwargs": {
+        "seed": 3
+      },
+      "elapsed_steps": 119,
+      "info": {
+        "success": true,
+        "near_object": 1.0,
+        "grasp_success": true,
+        "grasp_reward": 1.0,
+        "in_place_reward": 0.8077637875503951,
+        "obj_to_target": 0,
+        "unscaled_reward": 10.0
+      }
+    },
+    {
+      "episode_id": 4,
+      "reset_kwargs": {
+        "seed": 4
+      },
+      "elapsed_steps": 85,
+      "info": {
+        "success": true,
+        "near_object": 1.0,
+        "grasp_success": true,
+        "grasp_reward": 1.0,
+        "in_place_reward": 0.8185203256993283,
+        "obj_to_target": 0,
+        "unscaled_reward": 10.0
+      }
+    },
+    {
+      "episode_id": 5,
+      "reset_kwargs": {
+        "seed": 5
+      },
+      "elapsed_steps": 84,
+      "info": {
+        "success": true,
+        "near_object": 1.0,
+        "grasp_success": true,
+        "grasp_reward": 1.0,
+        "in_place_reward": 0.7991998107943632,
+        "obj_to_target": 0,
+        "unscaled_reward": 10.0
+      }
+    },
+    {
+      "episode_id": 6,
+      "reset_kwargs": {
+        "seed": 6
+      },
+      "elapsed_steps": 76,
+      "info": {
+        "success": true,
+        "near_object": 1.0,
+        "grasp_success": true,
+        "grasp_reward": 1.0,
+        "in_place_reward": 0.808086841091135,
+        "obj_to_target": 0,
+        "unscaled_reward": 10.0
+      }
+    },
+    {
+      "episode_id": 7,
+      "reset_kwargs": {
+        "seed": 7
+      },
+      "elapsed_steps": 82,
+      "info": {
+        "success": true,
+        "near_object": 1.0,
+        "grasp_success": true,
+        "grasp_reward": 1.0,
+        "in_place_reward": 0.7939164239438876,
+        "obj_to_target": 0,
+        "unscaled_reward": 10.0
+      }
+    },
+    {
+      "episode_id": 8,
+      "reset_kwargs": {
+        "seed": 8
+      },
+      "elapsed_steps": 80,
+      "info": {
+        "success": true,
+        "near_object": 1.0,
+        "grasp_success": true,
+        "grasp_reward": 1.0,
+        "in_place_reward": 0.8119596276155936,
+        "obj_to_target": 0,
+        "unscaled_reward": 10.0
+      }
+    },
+    {
+      "episode_id": 9,
+      "reset_kwargs": {
+        "seed": 9
+      },
+      "elapsed_steps": 83,
+      "info": {
+        "success": true,
+        "near_object": 1.0,
+        "grasp_success": true,
+        "grasp_reward": 1.0,
+        "in_place_reward": 0.7924826228637389,
+        "obj_to_target": 0,
+        "unscaled_reward": 10.0
+      }
+    },
+    {
+      "episode_id": 10,
+      "reset_kwargs": {
+        "seed": 10
+      },
+      "elapsed_steps": 85,
+      "info": {
+        "success": true,
+        "near_object": 1.0,
+        "grasp_success": true,
+        "grasp_reward": 1.0,
+        "in_place_reward": 0.8034773102607473,
+        "obj_to_target": 0,
+        "unscaled_reward": 10.0
+      }
+    },
+    {
+      "episode_id": 11,
+      "reset_kwargs": {
+        "seed": 11
+      },
+      "elapsed_steps": 91,
+      "info": {
+        "success": true,
+        "near_object": 1.0,
+        "grasp_success": true,
+        "grasp_reward": 1.0,
+        "in_place_reward": 0.81539151810699,
+        "obj_to_target": 0,
+        "unscaled_reward": 10.0
+      }
+    },
+    {
+      "episode_id": 12,
+      "reset_kwargs": {
+        "seed": 12
+      },
+      "elapsed_steps": 78,
+      "info": {
+        "success": true,
+        "near_object": 1.0,
+        "grasp_success": true,
+        "grasp_reward": 1.0,
+        "in_place_reward": 0.8048590694226161,
+        "obj_to_target": 0,
+        "unscaled_reward": 10.0
+      }
+    },
+    {
+      "episode_id": 13,
+      "reset_kwargs": {
+        "seed": 13
+      },
+      "elapsed_steps": 84,
+      "info": {
+        "success": true,
+        "near_object": 1.0,
+        "grasp_success": true,
+        "grasp_reward": 1.0,
+        "in_place_reward": 0.8170961986889018,
+        "obj_to_target": 0,
+        "unscaled_reward": 10.0
+      }
+    },
+    {
+      "episode_id": 14,
+      "reset_kwargs": {
+        "seed": 14
+      },
+      "elapsed_steps": 82,
+      "info": {
+        "success": true,
+        "near_object": 1.0,
+        "grasp_success": true,
+        "grasp_reward": 1.0,
+        "in_place_reward": 0.7908349667888235,
+        "obj_to_target": 0,
+        "unscaled_reward": 10.0
+      }
+    },
+    {
+      "episode_id": 15,
+      "reset_kwargs": {
+        "seed": 15
+      },
+      "elapsed_steps": 82,
+      "info": {
+        "success": true,
+        "near_object": 1.0,
+        "grasp_success": true,
+        "grasp_reward": 1.0,
+        "in_place_reward": 0.791879326340517,
+        "obj_to_target": 0,
+        "unscaled_reward": 10.0
+      }
+    },
+    {
+      "episode_id": 16,
+      "reset_kwargs": {
+        "seed": 16
+      },
+      "elapsed_steps": 77,
+      "info": {
+        "success": true,
+        "near_object": 1.0,
+        "grasp_success": true,
+        "grasp_reward": 1.0,
+        "in_place_reward": 0.8045063789203171,
+        "obj_to_target": 0,
+        "unscaled_reward": 10.0
+      }
+    },
+    {
+      "episode_id": 17,
+      "reset_kwargs": {
+        "seed": 17
+      },
+      "elapsed_steps": 83,
+      "info": {
+        "success": true,
+        "near_object": 1.0,
+        "grasp_success": true,
+        "grasp_reward": 1.0,
+        "in_place_reward": 0.7925555679576815,
+        "obj_to_target": 0,
+        "unscaled_reward": 10.0
+      }
+    },
+    {
+      "episode_id": 18,
+      "reset_kwargs": {
+        "seed": 18
+      },
+      "elapsed_steps": 76,
+      "info": {
+        "success": true,
+        "near_object": 1.0,
+        "grasp_success": true,
+        "grasp_reward": 1.0,
+        "in_place_reward": 0.811977829295853,
+        "obj_to_target": 0,
+        "unscaled_reward": 10.0
+      }
+    },
+    {
+      "episode_id": 19,
+      "reset_kwargs": {
+        "seed": 19
+      },
+      "elapsed_steps": 79,
+      "info": {
+        "success": true,
+        "near_object": 1.0,
+        "grasp_success": true,
+        "grasp_reward": 1.0,
+        "in_place_reward": 0.8101397847746374,
+        "obj_to_target": 0,
+        "unscaled_reward": 10.0
+      }
+    }
+  ]
+}

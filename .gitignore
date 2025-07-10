@@ -49,9 +49,7 @@ __jax_cache__/
 checkpoints/
 outputs/
 runs/
-data/
 datasets/
-models/
 results/
 *.csv
 *.tsv
