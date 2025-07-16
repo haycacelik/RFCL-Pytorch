@@ -14,20 +14,30 @@ import numpy as np
 def get_states_dataset(demo_dataset_path, skip_failed=True, num_demos: int = -1, shuffle: bool = False):
     states_dataset = defaultdict(dict)
     import os
+
     demo_dataset_path = os.path.expanduser(demo_dataset_path)
+    # where we get the episode data h5 file
     demo_dataset = h5py.File(demo_dataset_path)
+
+    
     with open(demo_dataset_path.replace(".h5", ".json"), "r") as f:
         demo_dataset_meta = json.load(f)
+
+    # get number of episodes using json file
     if num_demos == -1:
         num_demos = len(demo_dataset_meta["episodes"])
+
     load_count = 0
     if shuffle:
         np.random.shuffle(demo_dataset_meta["episodes"])
     for episode in demo_dataset_meta["episodes"]:
         # NOTE (stao): MS3 dataset stores success elsewhere
-        if not episode["success"] and skip_failed:
+        # check if it failed (1- needs pass-fail state, for that it needs the full value so we can say fail or pass)
+        if not episode["info"]["success"] and skip_failed:
             continue
+        # get the episodes one by one (2- needs episodes)
         demo_id = episode["episode_id"]
+        # get the 
         demo = demo_dataset[f"traj_{demo_id}"]
         reset_kwargs = episode["reset_kwargs"]
 
@@ -38,13 +48,13 @@ def get_states_dataset(demo_dataset_path, skip_failed=True, num_demos: int = -1,
 
         # handle both dict like env states and vector env states
         # NOTE (stao): ms3 dataset is formatted slightly differently, handled here
-        from mani_skill.utils import common
-        from mani_skill.trajectory.dataset import load_h5_data
-        env_states = common.flatten_state_dict(load_h5_data(demo["env_states"]))
-        # if isinstance(demo["env_states"], h5py.Dataset):
-        #     env_states = np.array(demo["env_states"])
-        # else:
-        #     env_states = [dict(zip(demo["env_states"], t)) for t in zip(*demo["env_states"].values())]
+        # from mani_skill.utils import common
+        # from mani_skill.trajectory.dataset import load_h5_data
+        # env_states = common.flatten_state_dict(load_h5_data(demo["env_states"]))
+        if isinstance(demo["env_states"], h5py.Dataset):
+            env_states = np.array(demo["env_states"])
+        else:
+            env_states = [dict(zip(demo["env_states"], t)) for t in zip(*demo["env_states"].values())]
 
         # lightly truncate trajectory to improve reverse curriculum speed, it is not necessary however
         num_steps_in_success = demo["success"][:].sum()

@@ -108,6 +108,7 @@ def main(cfg: SACExperiment):
     if "env_kwargs" not in env_cfg:
         env_cfg["env_kwargs"] = dict()
     cfg.eval_env = {**env_cfg, **cfg.eval_env}
+    # turns it into sacexperiment dataclass
     cfg = from_dict(data_class=SACExperiment, data=OmegaConf.to_container(cfg))
     env_cfg = cfg.env
     eval_env_cfg = cfg.eval_env
