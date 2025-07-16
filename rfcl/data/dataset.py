@@ -30,6 +30,7 @@ def get_states_dataset(demo_dataset_path, skip_failed=True, num_demos: int = -1,
     load_count = 0
     if shuffle:
         np.random.shuffle(demo_dataset_meta["episodes"])
+        
     for episode in demo_dataset_meta["episodes"]:
         # NOTE (stao): MS3 dataset stores success elsewhere
         # check if it failed (1- needs pass-fail state, for that it needs the full value so we can say fail or pass)

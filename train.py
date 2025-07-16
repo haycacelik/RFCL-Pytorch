@@ -28,6 +28,10 @@ from rfcl.models import NetworkConfig, build_network_from_cfg
 from rfcl.utils.parse import parse_cfg
 from rfcl.utils.spaces import get_action_dim
 
+# added by me
+# just to see if it runs since we cant visualize on the cluster
+os.environ["MUJOCO_GL"] = "egl"
+os.environ["DISPLAY"] = ""
 
 os.environ["TF_CPP_MIN_LOG_LEVEL"] = "2"
 
@@ -108,7 +112,6 @@ def main(cfg: SACExperiment):
     if "env_kwargs" not in env_cfg:
         env_cfg["env_kwargs"] = dict()
     cfg.eval_env = {**env_cfg, **cfg.eval_env}
-    # turns it into sacexperiment dataclass
     cfg = from_dict(data_class=SACExperiment, data=OmegaConf.to_container(cfg))
     env_cfg = cfg.env
     eval_env_cfg = cfg.eval_env
