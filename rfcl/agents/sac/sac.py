@@ -329,8 +329,9 @@ class SAC(BasePolicy):
             update_time_start = time.time()
             rng_key, update_rng_key, online_sample_key, offline_sample_key = jax.random.split(rng_key, 4)
             if self.offline_buffer is not None:
-                batch = self.replay_buffer.sample_random_batch(online_sample_key, self.cfg.batch_size * self.cfg.grad_updates_per_step // 2)
-                offline_batch = self.offline_buffer.sample_random_batch(offline_sample_key, self.cfg.batch_size * self.cfg.grad_updates_per_step // 2)
+                #removed key argument as it isnt used anyways!
+                batch = self.replay_buffer.sample_random_batch(elf.cfg.batch_size * self.cfg.grad_updates_per_step // 2)
+                offline_batch = self.offline_buffer.sample_random_batch(self.cfg.batch_size * self.cfg.grad_updates_per_step // 2)
                 batch = tools.combine(batch, offline_batch)
             else:
                 batch = self.replay_buffer.sample_random_batch(online_sample_key, self.cfg.batch_size * self.cfg.grad_updates_per_step)

@@ -5,7 +5,7 @@ from typing import Dict, List, Optional, Union
 
 import gymnasium
 import numpy as np
-from chex import Array
+#rom chex import Array
 from gymnasium import spaces
 from gymnasium.vector import AsyncVectorEnv, SyncVectorEnv, VectorEnv
 from gymnasium.wrappers import TimeLimit
@@ -46,8 +46,8 @@ class EnvConfig:
 
 @dataclass
 class EnvMeta:
-    sample_obs: Array
-    sample_acts: Array
+    sample_obs: np.array
+    sample_acts: np.array
     obs_space: spaces.Space
     act_space: spaces.Space
     env_suite: str
