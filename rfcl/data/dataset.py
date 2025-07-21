@@ -7,7 +7,7 @@ from collections import defaultdict
 from typing import Callable
 
 import h5py
-import jax
+#import jax
 import numpy as np
 
 
@@ -188,7 +188,7 @@ class ReplayDataset:
         print(f"Loaded {load_count} demos, total {len(self.data['reward'])} frames. First 10 Loaded {self.eps_ids[:10]}")
         self.size = len(self.data["env_obs"])
 
-    def sample_random_batch(self, rng_key: jax.random.PRNGKey, batch_size: int):
+    def sample_random_batch(self, batch_size: int):
         """
         Sample a batch of data
         """

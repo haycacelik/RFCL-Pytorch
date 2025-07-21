@@ -8,7 +8,9 @@ import numpy as np
 from gymnasium import spaces
 from gymnax.environments import spaces as jax_spaces
 
-
+#####
+#   Need to remove dependency on jax_spaces! (shift to gym or box2d or np?)
+####
 def get_obs_shape(
     observation_space: spaces.Space,
 ) -> Union[Tuple[int, ...], Dict[str, Tuple[int, ...]]]:
