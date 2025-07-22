@@ -7,7 +7,6 @@ from collections import defaultdict
 from typing import Callable
 
 import h5py
-import jax
 import numpy as np
 
 
@@ -16,29 +15,23 @@ def get_states_dataset(demo_dataset_path, skip_failed=True, num_demos: int = -1,
     import os
 
     demo_dataset_path = os.path.expanduser(demo_dataset_path)
-    # where we get the episode data h5 file
     demo_dataset = h5py.File(demo_dataset_path)
 
-    
     with open(demo_dataset_path.replace(".h5", ".json"), "r") as f:
         demo_dataset_meta = json.load(f)
 
-    # get number of episodes using json file
     if num_demos == -1:
         num_demos = len(demo_dataset_meta["episodes"])
 
     load_count = 0
     if shuffle:
         np.random.shuffle(demo_dataset_meta["episodes"])
-        
+
     for episode in demo_dataset_meta["episodes"]:
         # NOTE (stao): MS3 dataset stores success elsewhere
-        # check if it failed (1- needs pass-fail state, for that it needs the full value so we can say fail or pass)
         if not episode["info"]["success"] and skip_failed:
             continue
-        # get the episodes one by one (2- needs episodes)
         demo_id = episode["episode_id"]
-        # get the 
         demo = demo_dataset[f"traj_{demo_id}"]
         reset_kwargs = episode["reset_kwargs"]
 
@@ -107,7 +100,7 @@ class ReplayDataset:
         demo_dataset_path,
         shuffle=False,
         skip_failed=False,
-        num_demos=-1,
+        num_demos=-1, # at most how many demos, set to 1000 for adroit
         reward_mode="sparse",
         eps_ids=None,
         action_scale=None,
@@ -128,6 +121,7 @@ class ReplayDataset:
 
         with open(demo_dataset_path.replace(".h5", ".json"), "r") as f:
             demo_dataset_meta = json.load(f)
+        
         if num_demos == -1:
             num_demos = len(demo_dataset_meta["episodes"])
         load_count = 0
@@ -192,14 +186,14 @@ class ReplayDataset:
         if action_scale is not None:
             print("Using given action scale", action_scale)
             self.action_scale = action_scale
-            self.data["action"] = self.data["action"] * self.action_scale
+            self.data["ac tion"] = self.data["action"] * self.action_scale
             act_max, act_min = self.data["action"].max(0), self.data["action"].min(0)
             print(f"new act_max: {act_max} - act_min: {act_min}")
             print("Action scale", self.action_scale)
         print(f"Loaded {load_count} demos, total {len(self.data['reward'])} frames. First 10 Loaded {self.eps_ids[:10]}")
         self.size = len(self.data["env_obs"])
 
-    def sample_random_batch(self, rng_key: jax.random.PRNGKey, batch_size: int):
+    def sample_random_batch(self, batch_size: int):
         """
         Sample a batch of data
         """

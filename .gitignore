@@ -116,3 +116,4 @@ $RECYCLE.BIN/
 # Optional: Weights & Biases (if used)
 # -------------------------------
 wandb/
+exps

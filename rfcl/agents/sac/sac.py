@@ -83,21 +83,14 @@ class SAC(BasePolicy):
             initialized=False,
         )
 
-        if env_type == "jax":
-
-            def seed_sampler(rng_key):
-                return env.action_space().sample(rng_key)
-
-        else:
-
-            def seed_sampler(rng_key):
-                return jax.random.uniform(
-                    rng_key,
-                    shape=(cfg.num_envs, *env.single_action_space.shape),
-                    minval=-1.0,
-                    maxval=1.0,
-                    dtype=float,
-                )
+        def seed_sampler(rng_key):
+            return jax.random.uniform(
+                rng_key,
+                shape=(cfg.num_envs, *env.single_action_space.shape),
+                minval=-1.0,
+                maxval=1.0,
+                dtype=float,
+            )
 
         self.seed_sampler = seed_sampler
 
@@ -125,9 +118,6 @@ class SAC(BasePolicy):
         if self.cfg.target_entropy is None:
             self.cfg.target_entropy = -self.action_dim / 2
 
-        if self.jax_env:
-            self._env_step = jax.jit(self._env_step, static_argnames=["seed"])
-
     @partial(jax.jit, static_argnames=["self", "seed"])
     def _sample_action(self, rng_key, actor: DiagGaussianActor, env_obs, seed=False):
         if seed:
@@ -138,12 +128,8 @@ class SAC(BasePolicy):
         return a, {}
 
     def _env_step(self, rng_key: PRNGKey, loop_state: EnvLoopState, actor: DiagGaussianActor, seed=False):
-        if self.jax_env:
-            rng_key, *env_rng_keys = jax.random.split(rng_key, self.cfg.num_envs + 1)
-            data, loop_state = self.loop.rollout(jnp.stack(env_rng_keys), loop_state, actor, partial(self._sample_action, seed=seed), 1)
-        else:
-            rng_key, env_rng_key = jax.random.split(rng_key, 2)
-            data, loop_state = self.loop.rollout([env_rng_key], loop_state, actor, partial(self._sample_action, seed=seed), 1)
+        rng_key, env_rng_key = jax.random.split(rng_key, 2)
+        data, loop_state = self.loop.rollout([env_rng_key], loop_state, actor, partial(self._sample_action, seed=seed), 1)
         return loop_state, data
 
     def train(self, rng_key: PRNGKey, steps: int, callback_fn=None, verbose=1):
@@ -177,6 +163,7 @@ class SAC(BasePolicy):
         while self.state.total_env_steps < start_step + steps:
             rng_key, train_rng_key = jax.random.split(self.state.rng_key, 2)
             self.state, train_step_metrics = self.train_step(train_rng_key, self.state)
+            # print("self.state from training step", self.state)
             self.state = self.state.replace(rng_key=rng_key)
 
             # evaluate the current trained actor periodically
@@ -269,14 +256,12 @@ class SAC(BasePolicy):
                 ac.actor,
                 seed=(total_env_steps <= self.cfg.num_seed_steps and not (self.cfg.seed_with_policy)),
             )
-            if not self.jax_env:
-                final_infos = data[
-                    "final_info"
-                ]  # in gym loop this is just a list. in jax loop it should be a pytree with leaf shape (B, ) and a corresponding mask
-                del data["final_info"]
-                data = DefaultTimeStep(**data)
-            else:
-                final_infos = None  # TODO handle final infos in jax envs
+
+            final_infos = data[
+                "final_info"
+            ]  # in gym loop this is just a list. in jax loop it should be a pytree with leaf shape (B, ) and a corresponding mask
+            del data["final_info"]
+            data = DefaultTimeStep(**data)
 
             # move data to numpy
             data: DefaultTimeStep = jax.tree_map(lambda x: np.array(x)[:, 0], data)
@@ -290,12 +275,12 @@ class SAC(BasePolicy):
                 # if you want to always value bootstrap set masks to true.
                 train_metrics["return"].append(data.ep_ret[dones])
                 train_metrics["episode_len"].append(data.ep_len[dones])
-                if not self.jax_env:  # TODO fix for jax envs
-                    for i, final_info in enumerate(final_infos):
-                        if final_info is not None:
-                            if "stats" in final_info:
-                                for k in final_info["stats"]:
-                                    train_custom_stats[k].append(final_info["stats"][k])
+
+                for i, final_info in enumerate(final_infos):
+                    if final_info is not None:
+                        if "stats" in final_info:
+                            for k in final_info["stats"]:
+                                train_custom_stats[k].append(final_info["stats"][k])
             self.replay_buffer.store(
                 env_obs=data.env_obs,
                 reward=data.reward,
@@ -329,11 +314,14 @@ class SAC(BasePolicy):
             update_time_start = time.time()
             rng_key, update_rng_key, online_sample_key, offline_sample_key = jax.random.split(rng_key, 4)
             if self.offline_buffer is not None:
-                batch = self.replay_buffer.sample_random_batch(online_sample_key, self.cfg.batch_size * self.cfg.grad_updates_per_step // 2)
-                offline_batch = self.offline_buffer.sample_random_batch(offline_sample_key, self.cfg.batch_size * self.cfg.grad_updates_per_step // 2)
+                # batch = self.replay_buffer.sample_random_batch(online_sample_key, self.cfg.batch_size * self.cfg.grad_updates_per_step // 2)
+                batch = self.replay_buffer.sample_random_batch(batch_size=self.cfg.batch_size * self.cfg.grad_updates_per_step // 2)
+                # offline_batch = self.offline_buffer.sample_random_batch(offline_sample_key, self.cfg.batch_size * self.cfg.grad_updates_per_step // 2)
+                offline_batch = self.offline_buffer.sample_random_batch(batch_size=self.cfg.batch_size * self.cfg.grad_updates_per_step // 2)
                 batch = tools.combine(batch, offline_batch)
             else:
-                batch = self.replay_buffer.sample_random_batch(online_sample_key, self.cfg.batch_size * self.cfg.grad_updates_per_step)
+                # batch = self.replay_buffer.sample_random_batch(online_sample_key, self.cfg.batch_size * self.cfg.grad_updates_per_step)
+                batch = self.replay_buffer.sample_random_batch(batch_size=self.cfg.batch_size * self.cfg.grad_updates_per_step)
 
             batch = TimeStep(**batch)
             ac, update_aux = self.update_parameters(
@@ -440,8 +428,7 @@ class SAC(BasePolicy):
         # use serialized ac model
         self.state: SACTrainState = data["train_state"].replace(ac=ac)
         # set initialized to False so previous env data is reset if it's not a jax env with env states we can start from
-        if not self.jax_env:
-            self.state = self.state.replace(initialized=False)
+        self.state = self.state.replace(initialized=False)
         if self.logger is not None:
             self.logger.load(data["logger"])
         else:
