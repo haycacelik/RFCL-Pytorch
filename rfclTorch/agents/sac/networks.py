@@ -10,6 +10,7 @@ import copy
 import numpy as np
 import torch
 import torch.nn as nn
+import math
 # import flax
 # import flax.linen as nn
 # import jax
@@ -66,7 +67,7 @@ class Ensemble(nn.Module):
         return torch.stack(out,dim=0)
     
     def sample(self,numSample:int):
-        return random.sample(self.ensemble,numSample)
+        return random.sample(list(self.ensemble),numSample)
     
         
 
@@ -82,8 +83,6 @@ class Critic(nn.Module):
 
     #maybe have np array as input and to tensor()?
     def forward(self, obs: torch.Tensor, acts: torch.Tensor) -> torch.Tensor:
-        obs = torch.tensor(obs,dtype=torch.float32)
-        acts = torch.tensor(acts,dtype=torch.float32)
         x = torch.cat([obs, acts],dim= -1)
         features = self.feature_extractor(x)
         value = self.fc(features)
@@ -211,8 +210,8 @@ class ActorCritic(nn.Module):
         self.to(self.device)
 
     def act(self, obs, deterministic=False):
-        
-        obs = torch.tensor(obs,device=self.device,dtype=torch.float32)
+        if not isinstance(obs,torch.Tensor):
+            obs = torch.tensor(obs,device=self.device,dtype=torch.float32)
         """Sample actions deterministicly"""
         
         return self.actor(obs, deterministic=deterministic)
@@ -256,14 +255,18 @@ class ActorCritic(nn.Module):
         
         nextQ,_ = torch.min(nextQs,dim=0)
         
-        targetQ = batch.reward + discount * batch_mask * next_q
+        targetQ = batch_reward + discount * batch_mask * nextQ
         
 
         if backup_entropy:
             targetQ -= discount * batch_mask * self.temp() * next_log_probs
+            
+        
           
         Qs = self.critic(batch_next_obs,next_actions)  
 
+        targetQ = targetQ.unsqueeze(0).expand_as(Qs)
+        
         loss = self.criticLoss(Qs,targetQ)#might have issues with shape here!
         loss.backward()
         self.critic_optim.step()
@@ -271,14 +274,15 @@ class ActorCritic(nn.Module):
 
     def updateActor(self,batch: TimeStep):
         
+        batch_env_obs = torch.tensor(batch.env_obs,device=self.device,dtype=torch.float32)
         self.actor_optim.zero_grad()
-        dist = self.actor(batch.env_obs)
+        dist = self.act(batch_env_obs)
         actions = dist.sample()
         log_probs = dist.log_prob(actions)
-        Qs = self.critic(batch.env_obs,actions)
+        Qs = self.critic(batch_env_obs,actions)
         Q = torch.mean(Qs,dim=0)
         
-        loss = torch.mean(log_probs * ac.temp() - Q)
+        loss = torch.mean(log_probs * self.temp() - Q)
         loss.backward()
         self.actor_optim.step()
         return -log_probs.mean()

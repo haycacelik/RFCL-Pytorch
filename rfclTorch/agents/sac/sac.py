@@ -307,20 +307,18 @@ class SAC(BasePolicy):
                 batch = self.replay_buffer.sample_random_batch( self.cfg.batch_size * self.cfg.grad_updates_per_step)
 
             batch = TimeStep(**batch)
-            ac, update_aux = self.update_parameters(batch)
+            self.update_parameters(batch)
             #shouldn't need this since the sae actor-critic should update it's weights
-            # state = state.replace(
-            #     ac=ac,
-            #     training_steps=training_steps + self.cfg.grad_updates_per_step,
-            # )
+            state.training_steps = training_steps + self.cfg.grad_updates_per_step
+            
             update_time = time.time() - update_time_start
             time_metrics["update_time"] = update_time
 
+        print(f"done training step, time : {update_time}")
         return state, TrainStepMetrics(time=time_metrics, train=train_metrics, update=update_aux, train_stats=train_custom_stats)
 
     def update_parameters(self,batch:TimeStep):
         
-        print(f"update batch: {batch}")
         def split_batch(batch: TimeStep, num_splits: int) -> list[dict[str, np.ndarray]]:
             batch_dict = asdict(batch)
             split_dicts = [
@@ -337,17 +335,15 @@ class SAC(BasePolicy):
         
         #mini_batches = tools.tree_map(lambda x: np.array(np.split(x, update_rounds)), batch)
         mini_batches = split_batch(batch, update_rounds)
-        print(f"mini_batches {mini_batches}")
         for miniBatch in mini_batches:
             
             roundBatches = split_batch(TimeStep(**miniBatch), grad_updates_per_round)
             
             for roundBatch in roundBatches:
-                print(f"round batch: {roundBatch}")
-                self.ActorCritic.updateCritic(roundBatch,self.cfg.discount, self.cfg.backup_entropy, self.cfg.num_min_qs)
+                self.ActorCritic.updateCritic(TimeStep(**roundBatch),self.cfg.discount, self.cfg.backup_entropy, self.cfg.num_min_qs)
                 self.ActorCritic.updateTarget(self.cfg.tau)
-            entropy = self.ActorCritic.updateActor(miniBatch)
-            
+            entropy = self.ActorCritic.updateActor(TimeStep(**miniBatch))
+            entropy = entropy.detach()
             if self.cfg.learnable_temp:
                 self.ActorCritic.updateTemp(entropy,self.cfg.target_entropy)
         
