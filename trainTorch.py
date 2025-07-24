@@ -22,7 +22,7 @@ from rfclTorch.agents.sac.networks import DiagGaussianActor,Critic,Temperature#t
 from rfclTorch.data.dataset import ReplayDataset, get_states_dataset#done for now
 from rfclTorch.envs.make_env import EnvConfig, get_initial_state_wrapper, make_env_from_cfg# should work
 from rfclTorch.envs.wrappers.curriculum import ReverseCurriculumWrapper#should work?
-#from rfclTorch.envs.wrappers.forward_curriculum import SeedBasedForwardCurriculumWrapper #TODO
+from rfclTorch.envs.wrappers.forward_curriculum import SeedBasedForwardCurriculumWrapper #TODO
 from rfclTorch.logger import LoggerConfig#should just work
 from rfclTorch.models import NetworkConfig, build_network_from_cfg#to do Defined it here instead, trying to remove dependency on models dir
 from rfclTorch.utils.parse import parse_cfg#works for now
@@ -383,21 +383,21 @@ def main(cfg: SACExperiment):
     algo.setup_envs(env, eval_env)
     algo.state = algo.state.replace(initialized=False)
 
-    (
-        rng_key,
-        train_rng_key,
-    ) = jax.random.split(jax.random.PRNGKey(cfg.seed), 2)
+    # (
+    #     rng_key,
+    #     train_rng_key,
+    # ) = jax.random.split(jax.random.PRNGKey(cfg.seed), 2)
 
     # we seed with policy in stage 2 for algo.cfg.num_seed_steps
     algo.cfg.seed_with_policy = True
     algo.cfg.num_seed_steps = algo.state.total_env_steps + algo.cfg.num_seed_steps
     print(f"Seeding until {algo.cfg.num_seed_steps}")
     algo.train(
-        rng_key=train_rng_key,
+        # rng_key=train_rng_key,
         steps=cfg.train.steps - algo.state.total_env_steps,
-        verbose=cfg.verbose,
+        verbose=cfg.verbose
     )
-    algo.save(osp.join(algo.logger.model_path, "latest.jx"), with_buffer=False)
+    algo.save(osp.join(algo.logger.model_path, "latest.pth"), with_buffer=False)
 
 
 if __name__ == "__main__":

@@ -1,7 +1,7 @@
 from collections import deque
 from dataclasses import dataclass
 
-import jax
+#import jax
 import numpy as np
 from gymnasium.vector import VectorEnvWrapper
 from gymnasium.vector.vector_env import VectorEnv
@@ -215,13 +215,13 @@ class SeedBasedForwardCurriculumWrapper(VectorEnvWrapper):
 
     def reset(self, seed=None):
         # seed=None means to sample from env's groundtruth initial state distribution. Otherwise we can pick one from our database
-        if seed is not None:
-            assert self.wrapper_seed is None, "should only seed curriculum wrapper once"
-            # first call to reset the wrapper
-            self.wrapper_seed = seed
-            self.np_random = np.random.RandomState(seed=seed)
-            self.rng_key = jax.random.PRNGKey(seed=self.np_random.randint(0, 2**31 - 1))
-        seeds, seed_indices = self.sample_seeds(self.num_envs)
-        seeds = seeds.tolist()
-        seed_indices = seed_indices.tolist()
+        # if seed is not None:
+        #     assert self.wrapper_seed is None, "should only seed curriculum wrapper once"
+        #     # first call to reset the wrapper
+        #     self.wrapper_seed = seed
+        #     self.np_random = np.random.RandomState(seed=seed)
+        #     self.rng_key = jax.random.PRNGKey(seed=self.np_random.randint(0, 2**31 - 1))
+        # seeds, seed_indices = self.sample_seeds(self.num_envs)
+        # seeds = seeds.tolist()
+        # seed_indices = seed_indices.tolist()
         return super().reset(seed=seeds)
