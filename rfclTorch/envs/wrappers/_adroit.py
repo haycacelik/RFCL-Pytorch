@@ -13,9 +13,9 @@ from gymnasium import spaces
 from gymnasium_robotics.envs.adroit_hand.adroit_door import AdroitHandDoorEnv
 from gymnasium_robotics.envs.adroit_hand.adroit_relocate import AdroitHandRelocateEnv
 
-from rfcl.envs.wrappers.curriculum import InitialStateWrapper
-from rfcl.utils.io_utils import dump_json
-from rfcl.utils.visualization import (
+from rfclTorch.envs.wrappers.curriculum import InitialStateWrapper
+from rfclTorch.utils.io_utils import dump_json
+from rfclTorch.utils.visualization import (
     extract_scalars_from_info,
     images_to_video,
     put_info_on_image,

@@ -144,6 +144,7 @@ class InitialStateWrapper(gymnasium.Wrapper):
         return obs, info
 
     def step(self, action):
+        print(f"action 147 curriculum: {action}")
         observation, reward, terminated, truncated, info = super().step(action)
         self.step_count += 1
 
@@ -157,6 +158,7 @@ class InitialStateWrapper(gymnasium.Wrapper):
         info["sampled_start_step_frac"] = info["stats"]["sampled_start_step_frac"]
 
         # handle per-demo timelimit here
+        # remove this for lunarlander since it needs longer horizons! 
         if self.demo_horizon_to_max_steps_ratio > 0:
             dynamic_timelimit = 16 + (metadata.total_steps - self.current_episode_metadata.start_step) // self.demo_horizon_to_max_steps_ratio
             if self.step_count >= dynamic_timelimit:
@@ -330,6 +332,7 @@ class ReverseCurriculumWrapper(VectorEnvWrapper):
                 success = final_info["success"]
                 metadata = self.demo_metadata[demo_id]
 
+                # remove step requirement for lunar lander
                 # record successes only when steps back is equal to the current frontier / start step t_i assigned to demo tau_i
                 if final_info["steps_back"] == metadata.total_steps - metadata.start_step:
                     metadata.success_rate_buffer.append(int(success))

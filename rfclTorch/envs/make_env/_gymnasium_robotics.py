@@ -16,7 +16,7 @@ def is_gymnasium_robotics_env(env_id: str):
 
 def env_factory(env_id: str, idx: int, env_kwargs=dict(), record_video_path: str = None, wrappers=[]):
     def _init():
-        env = gymnasium.make(env_id, disable_env_checker=True, **env_kwargs)
+        env = gymnasium.make(env_id, disable_env_checker=True, render_mode="rgb_array",**env_kwargs)
         for wrapper in wrappers:
             env = wrapper(env)
         if record_video_path is not None and idx == 0:

@@ -1,18 +1,13 @@
 from typing import Sequence, Union
-import jax
+
 import numpy as np
-from chex import Array
+from numpy import ndarray
 
 
-def any_to_np(x: Array):
-    return np.array(x)
 
 
-def is_jax_arr(x: Array):
-    return isinstance(x, jax.numpy.ndarray)
 
-
-def copy_arr(x: Array):
+def copy_arr(x: ndarray):
     return x.copy()
 
 
@@ -52,47 +47,60 @@ def reached_freq(t, freq, step_size=1):
     return False
 
 
-def flatten_struct_to_dict(tree):
-    """
-    Takes any PyTree and flattens it to return a Python dictionary with the same values. Flexibly handle keys that are strings or attributes
-    """
-    flattened, _ = jax.tree_util.tree_flatten_with_path(tree)
-    out_dict = dict()
-    for key_path, value in flattened:
-        key_path_str = []
-        for part in key_path:
-            if isinstance(part, jax.tree_util.DictKey):
-                key_path_str.append(part.key)
-            else:
-                # if not DictKey, then this is of type jax.tree_util.GetAttrKey instead
-                key_path_str.append(part.name)
-        key_path_str = "/".join(key_path_str)
-        out_dict[key_path_str] = value
-    return out_dict
+# def flatten_struct_to_dict(tree):
+#     """
+#     Takes any PyTree and flattens it to return a Python dictionary with the same values. Flexibly handle keys that are strings or attributes
+#     """
+#     flattened, _ = jax.tree_util.tree_flatten_with_path(tree)
+#     out_dict = dict()
+#     for key_path, value in flattened:
+#         key_path_str = []
+#         for part in key_path:
+#             if isinstance(part, jax.tree_util.DictKey):
+#                 key_path_str.append(part.key)
+#             else:
+#                 # if not DictKey, then this is of type jax.tree_util.GetAttrKey instead
+#                 key_path_str.append(part.name)
+#         key_path_str = "/".join(key_path_str)
+#         out_dict[key_path_str] = value
+#     return out_dict
 
-try:
-    import torch
-    def _to_numpy(array: Union[Array, Sequence]) -> np.ndarray:
-        if isinstance(array, (dict)):
-            return {k: _to_numpy(v) for k, v in array.items()}
-        if isinstance(array, torch.Tensor):
-            return array.cpu().numpy()
-        if (
-            isinstance(array, np.ndarray)
-            or isinstance(array, bool)
-            or isinstance(array, str)
-            or isinstance(array, float)
-            or isinstance(array, int)
-        ):
-            return array
-        else:
-            return np.array(array)
+# try:
+#     import torch
+#     def _to_numpy(array: Union[Array, Sequence]) -> np.ndarray:
+#         if isinstance(array, (dict)):
+#             return {k: _to_numpy(v) for k, v in array.items()}
+#         if isinstance(array, torch.Tensor):
+#             return array.cpu().numpy()
+#         if (
+#             isinstance(array, np.ndarray)
+#             or isinstance(array, bool)
+#             or isinstance(array, str)
+#             or isinstance(array, float)
+#             or isinstance(array, int)
+#         ):
+#             return array
+#         else:
+#             return np.array(array)
 
 
-    def to_numpy(array: Union[Array, Sequence], dtype=None) -> np.ndarray:
-        array = _to_numpy(array)
-        if dtype is not None:
-            return array.astype(dtype)
-        return array
-except:
-    pass
+#     def to_numpy(array: Union[Array, Sequence], dtype=None) -> np.ndarray:
+#         array = _to_numpy(array)
+#         if dtype is not None:
+#             return array.astype(dtype)
+#         return array
+# except:
+#     pass
+
+
+#got this from chatgpt, replacement for jax.tree_map, just recursively applies function f to all values in a datastrucutre
+def tree_map(f, tree):
+    if isinstance(tree, dict):
+        return {k: f(v) for k, v in tree.items()}
+    elif isinstance(tree, list):#this probably won't work
+        return [f(v)for v in tree]
+    elif isinstance(tree, tuple):
+        return tuple(f(v) for v in tree)
+    else:
+        print("chatgpt is stupid!")
+        return f(tree)

@@ -11,11 +11,11 @@ from gymnasium.vector import AsyncVectorEnv, SyncVectorEnv, VectorEnv
 from gymnasium.wrappers import TimeLimit
 from omegaconf import OmegaConf
 
-import rfcl.envs.make_env._gymnasium_robotics as _gymnasium_robotics
-import rfcl.envs.make_env._mani_skill2 as _mani_skill2
-import rfcl.envs.make_env._meta_world as _meta_world
-import rfcl.envs.make_env._mani_skill3 as _mani_skill3
-from rfcl.envs.wrappers.common import (
+import rfclTorch.envs.make_env._gymnasium_robotics as _gymnasium_robotics
+import rfclTorch.envs.make_env._mani_skill2 as _mani_skill2
+import rfclTorch.envs.make_env._meta_world as _meta_world
+import rfclTorch.envs.make_env._mani_skill3 as _mani_skill3
+from rfclTorch.envs.wrappers.common import (
     ContinuousTaskWrapper,
     EpisodeStatsWrapper,
     SparseRewardWrapper,
@@ -46,8 +46,8 @@ class EnvConfig:
 
 @dataclass
 class EnvMeta:
-    sample_obs: np.array
-    sample_acts: np.array
+    sample_obs: np.ndarray
+    sample_acts: np.ndarray
     obs_space: spaces.Space
     act_space: spaces.Space
     env_suite: str

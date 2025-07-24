@@ -24,8 +24,9 @@ def get_states_dataset(demo_dataset_path, skip_failed=True, num_demos: int = -1,
     if shuffle:
         np.random.shuffle(demo_dataset_meta["episodes"])
     for episode in demo_dataset_meta["episodes"]:
+        #print(episode)
         # NOTE (stao): MS3 dataset stores success elsewhere
-        if not episode["success"] and skip_failed:
+        if not episode["info"]["success"] and skip_failed:
             continue
         demo_id = episode["episode_id"]
         demo = demo_dataset[f"traj_{demo_id}"]
@@ -38,13 +39,13 @@ def get_states_dataset(demo_dataset_path, skip_failed=True, num_demos: int = -1,
 
         # handle both dict like env states and vector env states
         # NOTE (stao): ms3 dataset is formatted slightly differently, handled here
-        from mani_skill.utils import common
-        from mani_skill.trajectory.dataset import load_h5_data
-        env_states = common.flatten_state_dict(load_h5_data(demo["env_states"]))
-        # if isinstance(demo["env_states"], h5py.Dataset):
-        #     env_states = np.array(demo["env_states"])
-        # else:
-        #     env_states = [dict(zip(demo["env_states"], t)) for t in zip(*demo["env_states"].values())]
+        # from mani_skill.utils import common
+        # from mani_skill.trajectory.dataset import load_h5_data
+        # env_states = common.flatten_state_dict(load_h5_data(demo["env_states"]))
+        if isinstance(demo["env_states"], h5py.Dataset):
+            env_states = np.array(demo["env_states"])
+        else:
+            env_states = [dict(zip(demo["env_states"], t)) for t in zip(*demo["env_states"].values())]
 
         # lightly truncate trajectory to improve reverse curriculum speed, it is not necessary however
         num_steps_in_success = demo["success"][:].sum()
@@ -145,7 +146,7 @@ class ReplayDataset:
             actions = np.array(demo["actions"])
 
             if reward_mode == "sparse":
-                rewards = np.array(demo["success"]).astype(np.float_)
+                rewards = np.array(demo["success"]).astype(np.float64)
             elif reward_mode == "negative_sparse":
                 rewards = rewards - 1
             else:
