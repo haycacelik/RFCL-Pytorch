@@ -17,16 +17,16 @@ import numpy as np
 import optax
 from omegaconf import OmegaConf
 
-from rfcl.agents.sac import SAC, ActorCritic, SACConfig
-from rfcl.agents.sac.networks import DiagGaussianActor
-from rfcl.data.dataset import ReplayDataset, get_states_dataset
-from rfcl.envs.make_env import EnvConfig, get_initial_state_wrapper, make_env_from_cfg
-from rfcl.envs.wrappers.curriculum import ReverseCurriculumWrapper
-from rfcl.envs.wrappers.forward_curriculum import SeedBasedForwardCurriculumWrapper
-from rfcl.logger import LoggerConfig
-from rfcl.models import NetworkConfig, build_network_from_cfg
-from rfcl.utils.parse import parse_cfg
-from rfcl.utils.spaces import get_action_dim
+from rfclTorch.rfcl.agents.sac import SAC, ActorCritic, SACConfig
+from rfclTorch.rfcl.agents.sac.networks import DiagGaussianActor
+from rfclTorch.rfcl.data.dataset import ReplayDataset, get_states_dataset
+from rfclTorch.rfcl.envs.make_env import EnvConfig, get_initial_state_wrapper, make_env_from_cfg
+from rfclTorch.rfcl.envs.wrappers.curriculum import ReverseCurriculumWrapper
+from rfclTorch.rfcl.envs.wrappers.forward_curriculum import SeedBasedForwardCurriculumWrapper
+from rfclTorch.rfcl.logger import LoggerConfig
+from rfclTorch.rfcl.models import NetworkConfig, build_network_from_cfg
+from rfclTorch.rfcl.utils.parse import parse_cfg
+from rfclTorch.rfcl.utils.spaces import get_action_dim
 
 
 os.environ["TF_CPP_MIN_LOG_LEVEL"] = "2"
@@ -213,7 +213,6 @@ def main(cfg: SACExperiment):
             state_dependent_std=True,
         )
         ac = ActorCritic.create(
-            jax.random.PRNGKey(cfg.seed),
             actor=actor,
             critic_feature_extractor=build_network_from_cfg(cfg.network.critic),
             sample_obs=sample_obs,

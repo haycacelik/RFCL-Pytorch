@@ -4,18 +4,18 @@ Model class
 import os
 from typing import Any, Callable, Optional
 
-import flax
-import flax.linen as nn
-import flax.serialization
-import optax
-from chex import PRNGKey
-from flax import struct
+# import flax
+# import flax.linen as nn
+# import flax.serialization
+# import optax
+# from chex import PRNGKey
+# from flax import struct
 
-
+import torch
 Params = flax.core.FrozenDict[str, Any]
 # T = TypeVar("T", bound=nn.Module)
 
-
+###THIS FILE SHOULD BE UNNECESSARY!
 @struct.dataclass
 class Model:
     """
@@ -35,6 +35,8 @@ class Model:
     opt_state: Optional[optax.OptState] = None
     step: int = 0
 
+
+        
     @classmethod
     def create(
         cls,

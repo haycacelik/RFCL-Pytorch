@@ -9,7 +9,7 @@ import os.path as osp
 import sys
 import warnings
 from dataclasses import asdict, dataclass
-from typing import Optional
+from typing import Optional, Any
 
 import gymnasium as gym
 #import jax
@@ -17,16 +17,16 @@ import numpy as np
 #import optax
 from omegaconf import OmegaConf
 
-from rfcl.agents.sac import SAC, ActorCritic, SACConfig#todo
-from rfcl.agents.sac.networks import DiagGaussianActor#todo
-from rfcl.data.dataset import ReplayDataset, get_states_dataset#done for now
-from rfcl.envs.make_env import EnvConfig, get_initial_state_wrapper, make_env_from_cfg# should work
-from rfcl.envs.wrappers.curriculum import ReverseCurriculumWrapper#should work?
-from rfcl.envs.wrappers.forward_curriculum import SeedBasedForwardCurriculumWrapper#should work
-from rfcl.logger import LoggerConfig#should just work
-from rfcl.models import NetworkConfig, build_network_from_cfg#to do
-from rfcl.utils.parse import parse_cfg#works for now
-from rfcl.utils.spaces import get_action_dim#todo
+from rfclTorch.agents.sac import SAC, ActorCritic, SACConfig#todo
+from rfclTorch.agents.sac.networks import DiagGaussianActor,Critic,Temperature#todo
+from rfclTorch.data.dataset import ReplayDataset, get_states_dataset#done for now
+from rfclTorch.envs.make_env import EnvConfig, get_initial_state_wrapper, make_env_from_cfg# should work
+from rfclTorch.envs.wrappers.curriculum import ReverseCurriculumWrapper#should work?
+#from rfclTorch.envs.wrappers.forward_curriculum import SeedBasedForwardCurriculumWrapper #TODO
+from rfclTorch.logger import LoggerConfig#should just work
+from rfclTorch.models import NetworkConfig, build_network_from_cfg#to do Defined it here instead, trying to remove dependency on models dir
+from rfclTorch.utils.parse import parse_cfg#works for now
+from rfclTorch.utils.spaces import get_action_dim#todo
 
 
 os.environ["TF_CPP_MIN_LOG_LEVEL"] = "2"
@@ -34,6 +34,14 @@ os.environ["TF_CPP_MIN_LOG_LEVEL"] = "2"
 #*************************************#
 #*****Keeping data classes same*******#
 #*************************************#
+
+@dataclass
+class NetworkConfig:
+    type: str
+    arch_cfg: Any
+
+
+
 @dataclass
 class TrainConfig:
     steps: int
@@ -207,6 +215,13 @@ def main(cfg: SACExperiment):
 
     # create actor and critics models
     act_dims = get_action_dim(env_meta.act_space)
+    print(act_dims)
+    cfg.network.actor.arch_cfg["inFeatures"] = len(sample_obs)
+    cfg.network.critic.arch_cfg["inFeatures"] = len(sample_obs) + len(sample_acts)
+    print(sample_obs)
+    print(sample_obs.shape)
+    print(cfg.network.actor)
+    print(cfg.network.critic)
 
 #should work till here without many changes, independant of Jax
 
@@ -214,22 +229,31 @@ def main(cfg: SACExperiment):
         actor = DiagGaussianActor(
             feature_extractor=build_network_from_cfg(cfg.network.actor),
             act_dims=act_dims,
+            in_dims=cfg.network.actor.arch_cfg["features"][-1],
             state_dependent_std=True,
         )
-        ac = ActorCritic.create(
-            jax.random.PRNGKey(cfg.seed),
-            actor=actor,
-            critic_feature_extractor=build_network_from_cfg(cfg.network.critic),
-            sample_obs=sample_obs,
-            sample_acts=sample_acts,
-            initial_temperature=cfg.sac.initial_temperature,
-            actor_optim=optax.adam(learning_rate=cfg.train.actor_lr),
-            critic_optim=optax.adam(learning_rate=cfg.train.critic_lr),
+        
+        critic = Critic(
+            feature_extractor=build_network_from_cfg(cfg.network.critic),
+            in_dims=cfg.network.critic.arch_cfg["features"][-1]
         )
+        
+        temp = Temperature()
+        
+        ac = ActorCritic(
+            actor = actor,
+            critic = critic,
+            target_critic = critic,
+            temp = temp,
+            sample_obs=sample_obs,
+            sample_acts = sample_acts, 
+        )
+
         return ac
 
     # create our algorithm
     ac = create_ac_model()
+
     cfg.logger.cfg = asdict(cfg)
     logger_cfg = cfg.logger
     algo = SAC(
@@ -240,6 +264,7 @@ def main(cfg: SACExperiment):
         logger_cfg=logger_cfg,
         cfg=cfg.sac,
     )
+    
 
     ###########################################
     # Stage 1 Training: Reverse Curriculum RL #
@@ -275,9 +300,8 @@ def main(cfg: SACExperiment):
             return False
 
         if cfg.stage_1_model_path is None:
-            rng_key, train_rng_key = jax.random.split(jax.random.PRNGKey(cfg.seed), 2)
+            #rng_key, train_rng_key = jax.random.split(jax.random.PRNGKey(cfg.seed), 2)
             algo.train(
-                rng_key=train_rng_key,
                 steps=cfg.train.steps,
                 callback_fn=early_stop_fn,
                 verbose=cfg.verbose,

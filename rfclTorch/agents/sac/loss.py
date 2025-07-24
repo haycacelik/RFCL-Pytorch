@@ -1,5 +1,6 @@
 """
 Update / Loss Functions for SAC
+NO LONGER NEEDED
 """
 
 from typing import Any, Tuple

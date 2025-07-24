@@ -6,9 +6,8 @@ import math
 from abc import ABC
 from functools import partial
 
-import jax
+
 import numpy as np
-from chex import PRNGKey
 
 
 class BaseBuffer(ABC):
@@ -140,7 +139,7 @@ class GenericBuffer(BaseBuffer):
                 batch_data[k] = data[batch_ids, env_ids]
         return batch_data
 
-    def sample_random_batch(self, rng_key: PRNGKey, batch_size: int):
+    def sample_random_batch(self, batch_size: int):
         """
         Sample a batch of data with replacement
         """
@@ -152,10 +151,10 @@ class GenericBuffer(BaseBuffer):
         return self._get_batch_by_ids(buffers=self.buffers, batch_ids=batch_ids, env_ids=env_ids)
 
 
-# Unused: is generally slower than numpy
-@partial(jax.jit, static_argnames=["batch_size", "buffer_size", "num_envs"])
-def sample_random_batch_env_ids(rng_key: PRNGKey, batch_size: int, buffer_size: int, num_envs: int):
-    rng_key, batch_rng, env_rng = jax.random.split(rng_key, 3)
-    batch_ids = jax.random.randint(batch_rng, shape=(batch_size,), minval=0, maxval=buffer_size)
-    env_ids = jax.random.randint(env_rng, shape=(batch_size,), minval=0, maxval=num_envs)
-    return batch_ids, env_ids
+# # Unused: is generally slower than numpy
+# @partial(jax.jit, static_argnames=["batch_size", "buffer_size", "num_envs"])
+# def sample_random_batch_env_ids(rng_key: PRNGKey, batch_size: int, buffer_size: int, num_envs: int):
+#     rng_key, batch_rng, env_rng = jax.random.split(rng_key, 3)
+#     batch_ids = jax.random.randint(batch_rng, shape=(batch_size,), minval=0, maxval=buffer_size)
+#     env_ids = jax.random.randint(env_rng, shape=(batch_size,), minval=0, maxval=num_envs)
+#     return batch_ids, env_ids

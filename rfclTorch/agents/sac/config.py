@@ -5,8 +5,7 @@ Configurations and utility classes
 from dataclasses import dataclass
 from typing import Optional
 
-import chex
-from flax import struct
+from numpy import ndarray
 
 
 @dataclass
@@ -116,10 +115,10 @@ class SACConfig:
     """
 
 
-@struct.dataclass
+@dataclass
 class TimeStep:
-    action: chex.Array = None
-    env_obs: chex.Array = None
-    next_env_obs: chex.Array = None
-    reward: chex.Array = None
-    mask: chex.Array = None
+    action: ndarray = None
+    env_obs: ndarray = None
+    next_env_obs: ndarray = None
+    reward: ndarray = None
+    mask: ndarray = None
