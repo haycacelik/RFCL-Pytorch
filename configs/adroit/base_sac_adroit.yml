@@ -7,7 +7,7 @@ verbose: 1
 env:
   env_id: None
   max_episode_steps: 100
-  num_envs: 8
+  num_envs: 12 #change to 8
   env_type: "gym:cpu"
   env_kwargs:
     render_mode: "rgb_array"
@@ -32,11 +32,11 @@ sac:
   tau: 0.005
   backup_entropy: False
 
-  eval_freq: 50_000
+  eval_freq: 50_000 #for testing cvhange back to 50_000
   eval_steps: 1000
 
   log_freq: 1000
-  save_freq: 50_000
+  save_freq: 100_000
 
   learnable_temp: True
   initial_temperature: 1.0

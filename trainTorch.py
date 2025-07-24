@@ -306,7 +306,7 @@ def main(cfg: SACExperiment):
                 callback_fn=early_stop_fn,
                 verbose=cfg.verbose,
             )
-            algo.save(osp.join(algo.logger.model_path, "stage_1.jx"), with_buffer=True)
+            algo.save(osp.join(algo.logger.model_path, "stage_1.pth"), with_buffer=True)
             algo.logger.tb_writer.add_scalar("train_stats/stage_1_steps", algo.state.total_env_steps, algo.state.total_env_steps)
             if algo.logger.wandb:
                 algo.logger.wandb_run.log(data={"train_stats/stage_1_steps": algo.state.total_env_steps}, step=algo.state.total_env_steps)
