@@ -116,7 +116,7 @@ class SAC(BasePolicy):
         return a, {}
     
     def _det_action(self,env_obs):
-        return self.ActorCritic.act(env_obs,True)
+        return self.ActorCritic.act(env_obs,True), {}
 
     def _env_step(self, loop_state: EnvLoopState, actor: DiagGaussianActor, seed=False):
 

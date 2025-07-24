@@ -141,9 +141,9 @@ class BasePolicy:
 
         final_infos = eval_buffer["final_info"]
         del eval_buffer["final_info"]
-        if isinstance(eval_buffer, dict):
-            eval_buffer = DefaultTimeStep(**eval_buffer)
-        eval_buffer: DefaultTimeStep = tree_map(lambda x: np.array(x), eval_buffer) #custom implementation in tools/utils.py
+        #if isinstance(eval_buffer, dict):
+        eval_buffer = DefaultTimeStep(**eval_buffer)
+        #eval_buffer: DefaultTimeStep = tree_map(lambda x: np.array(x), eval_buffer) #custom implementation in tools/utils.py
         eval_episode_ends = eval_buffer.truncated | eval_buffer.terminated
         eval_ep_rets = eval_buffer.ep_ret[eval_episode_ends].flatten()
         eval_ep_lens = eval_buffer.ep_len[eval_episode_ends].flatten()
