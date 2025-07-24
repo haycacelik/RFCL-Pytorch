@@ -294,6 +294,7 @@ class SAC(BasePolicy):
             total_env_steps=total_env_steps + self.cfg.num_envs * self.cfg.steps_per_env,
         )
         # update policy
+        #print(f"rollout done, time {rollout_time}")
         update_aux = dict()
         if self.state.total_env_steps >= self.cfg.num_seed_steps:
             update_time_start = time.time()
@@ -313,8 +314,9 @@ class SAC(BasePolicy):
             
             update_time = time.time() - update_time_start
             time_metrics["update_time"] = update_time
+            #print(f"done training step, time : {update_time}")
 
-        print(f"done training step, time : {update_time}")
+        
         return state, TrainStepMetrics(time=time_metrics, train=train_metrics, update=update_aux, train_stats=train_custom_stats)
 
     def update_parameters(self,batch:TimeStep):
