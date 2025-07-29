@@ -1,0 +1,109 @@
+seed: 1014
+sac:
+  num_seed_steps: 5000
+  seed_with_policy: false
+  replay_buffer_capacity: 1000000
+  batch_size: 256
+  num_envs: 1
+  steps_per_env: 4
+  grad_updates_per_step: 16
+  tau: 0.005
+  discount: 0.99
+  backup_entropy: false
+  target_entropy: null
+  learnable_temp: true
+  initial_temperature: 1.0
+  actor_update_freq: 1
+  target_update_freq: 1
+  num_qs: 10
+  num_min_qs: 2
+  eval_freq: 50000
+  eval_steps: 1000
+  num_eval_envs: 2
+  log_freq: 1000
+  save_freq: 100000
+  save_buffer_in_checkpoints: false
+env:
+  env_id: AdroitHandRelocateSparse-v1
+  env_type: gym:cpu
+  max_episode_steps: 200
+  num_envs: 1
+  env_kwargs:
+    render_mode: rgb_array
+    reward_type: sparse
+  action_scale: null
+eval_env:
+  env_id: AdroitHandRelocateSparse-v1
+  env_type: gym:cpu
+  max_episode_steps: 200
+  num_envs: 2
+  env_kwargs:
+    render_mode: rgb_array
+    reward_type: sparse
+  action_scale: null
+train:
+  steps: 2000000
+  actor_lr: 0.0003
+  critic_lr: 0.0003
+  dataset_path: demos/d4rl/AdroitHandRelocateSparse-v1/trajectory.h5
+  shuffle_demos: true
+  num_demos: 5
+  data_action_scale: null
+  reverse_step_size: 8
+  curriculum_method: per_demo
+  start_step_sampler: geometric
+  per_demo_buffer_size: 3
+  demo_horizon_to_max_steps_ratio: 3
+  train_on_demo_actions: true
+  forward_curriculum: success_once_score
+  staleness_transform: rankmin
+  staleness_coef: 0.1
+  staleness_temperature: 0.1
+  score_transform: rankmin
+  score_temperature: 0.1
+  num_seeds: 1000
+  load_actor: true
+  load_critic: true
+  load_as_offline_buffer: true
+  load_as_online_buffer: false
+  use_orig_env_for_eval: true
+  eval_start_of_demos: false
+network:
+  actor:
+    type: mlp
+    arch_cfg:
+      features:
+      - 256
+      - 256
+      - 256
+      output_activation: relu
+      inFeatures: 39
+  critic:
+    type: mlp
+    arch_cfg:
+      features:
+      - 256
+      - 256
+      - 256
+      output_activation: relu
+      use_layer_norm: true
+      inFeatures: 69
+logger:
+  workspace: exps
+  exp_name: adroit/adroitrelocate/rfcl_fast_5_demos_s1014_17
+  clear_out: false
+  project_name: RFCL-Sparse
+  tensorboard: true
+  wandb: false
+  wandb_cfg:
+    group: RFCL-Adroit-Sparse-Baseline
+  cfg: null
+  best_stats_cfg: null
+  save_fn: null
+verbose: 1
+algo: sac
+stage_1_model_path: null
+save_eval_video: true
+stage_1_only: false
+stage_2_only: false
+demo_seed: null

@@ -1,3 +1,14 @@
+# # @package _global_
+# defaults:
+#   - override hydra/launcher: basic
+
+# # Hydra configuration
+# hydra:
+#   run:
+#     dir: outputs/${now:%Y-%m-%d}/${now:%H-%M-%S}
+#   job:
+#     chdir: true
+
 jax_env: False
 
 seed: 0
@@ -32,7 +43,7 @@ sac:
   tau: 0.005
   backup_entropy: False
 
-  eval_freq: 50_000 #for testing cvhange back to 50_000
+  eval_freq: 50_000 #for testing change back to 50_000
   eval_steps: 1000
 
   log_freq: 1000
@@ -87,7 +98,7 @@ train:
   num_seeds: 1000
 logger:
   tensorboard: True
-  wandb: False
+  wandb: True
 
   workspace: "exps"
   project_name: "RFCL-Sparse"

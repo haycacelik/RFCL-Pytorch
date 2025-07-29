@@ -59,23 +59,6 @@ class BasePolicy:
 
     def setup_envs(self, env, eval_env=None):
         self.loop: BaseEnvLoop = None
-        # if self.jax_env:
-        #     import gymnax.environments.environment
-
-        #     # TODO see when gymnax upgrades to gymnasium
-        #     self.env: gymnax.environments.environment.Environment = env
-        #     self.env_step: Callable[
-        #         [PRNGKey, EnvState, EnvAction],
-        #         Tuple[EnvObs, EnvState, float, bool, bool, Any],
-        #     ] = self.env.step
-        #     self.env_reset: Callable[[PRNGKey], Tuple[EnvObs, EnvState, Any]] = self.env.reset
-
-        #     self.loop = JaxLoop(env_reset=self.env.reset, env_step=self.env.step, num_envs=self.num_envs)
-        #     self.observation_space = self.env.observation_space()
-        #     self.action_space = self.env.action_space()
-        # else:
-
-
         self.env: gymnasium.vector.VectorEnv = env
 
         self.loop = GymLoop(self.env, num_envs=self.num_envs, env_type=self.env_type)
@@ -137,7 +120,6 @@ class BasePolicy:
             steps_per_env=steps_per_env,
             progress_bar=progress_bar,
         )
-        # TODO handle jax env infos
 
         final_infos = eval_buffer["final_info"]
         del eval_buffer["final_info"]

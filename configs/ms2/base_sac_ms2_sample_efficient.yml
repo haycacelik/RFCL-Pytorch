@@ -89,7 +89,7 @@ train:
 
 logger:
   tensorboard: True
-  wandb: False
+  wandb: True
 
   workspace: "exps"
   project_name: "RFCL-Sparse"

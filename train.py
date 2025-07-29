@@ -31,6 +31,7 @@ from rfclTorch.rfcl.utils.spaces import get_action_dim
 
 os.environ["TF_CPP_MIN_LOG_LEVEL"] = "2"
 
+print("using jax")
 
 @dataclass
 class TrainConfig:

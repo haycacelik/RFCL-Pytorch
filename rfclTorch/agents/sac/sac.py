@@ -77,7 +77,6 @@ class SAC(BasePolicy):
             initialized=False,
         )
 
-
         def seed_sampler():
             shape = (self.cfg.num_envs, *self.env.single_action_space.shape)
             return torch.distributions.Uniform(-1.0, 1.0).sample(shape)
@@ -119,7 +118,6 @@ class SAC(BasePolicy):
         return self.ActorCritic.act(env_obs,True), {}
 
     def _env_step(self, loop_state: EnvLoopState, actor: DiagGaussianActor, seed=False):
-
         data, loop_state = self.loop.rollout(loop_state, partial(self._sample_action), 1)
         return loop_state, data
 
@@ -131,8 +129,6 @@ class SAC(BasePolicy):
                 Max number of environment samples before training is stopped.
         """
         train_start_time = time.time()
-
-
 
         # if env_obs is None, then this is the first time calling train and we prepare the environment
         if not self.state.initialized:
@@ -319,8 +315,8 @@ class SAC(BasePolicy):
         
         return state, TrainStepMetrics(time=time_metrics, train=train_metrics, update=update_aux, train_stats=train_custom_stats)
 
-    def update_parameters(self,batch:TimeStep):
-        
+    
+    def update_parameters(self, batch: TimeStep):
         def split_batch(batch: TimeStep, num_splits: int) -> list[dict[str, np.ndarray]]:
             batch_dict = asdict(batch)
             split_dicts = [
@@ -332,23 +328,34 @@ class SAC(BasePolicy):
         mini_batch_size = self.cfg.batch_size
         assert mini_batch_size * self.cfg.grad_updates_per_step == batch.action.shape[0]
         assert self.cfg.grad_updates_per_step % self.cfg.actor_update_freq == 0
-        update_rounds = self.cfg.grad_updates_per_step // self.cfg.actor_update_freq
-        grad_updates_per_round = self.cfg.grad_updates_per_step // update_rounds
         
-        #mini_batches = tools.tree_map(lambda x: np.array(np.split(x, update_rounds)), batch)
-        mini_batches = split_batch(batch, update_rounds)
-        for miniBatch in mini_batches:
-            
-            roundBatches = split_batch(TimeStep(**miniBatch), grad_updates_per_round)
-            
-            for roundBatch in roundBatches:
-                self.ActorCritic.updateCritic(TimeStep(**roundBatch),self.cfg.discount, self.cfg.backup_entropy, self.cfg.num_min_qs)
-                self.ActorCritic.updateTarget(self.cfg.tau)
-            entropy = self.ActorCritic.updateActor(TimeStep(**miniBatch))
-            entropy = entropy.detach()
-            if self.cfg.learnable_temp:
-                self.ActorCritic.updateTemp(entropy,self.cfg.target_entropy)
+        # Split the batch into individual mini-batches for each gradient update
+        mini_batches = split_batch(batch, self.cfg.grad_updates_per_step)
         
+        # Process critic updates for all mini-batches
+        for i, mini_batch_dict in enumerate(mini_batches):
+            mini_batch = TimeStep(**mini_batch_dict)
+            
+            # Update critic on every mini-batch
+            self.ActorCritic.updateCritic(mini_batch, self.cfg.discount, self.cfg.backup_entropy, self.cfg.num_min_qs)
+            self.ActorCritic.updateTarget(self.cfg.tau)
+            
+            # Update actor only at specified frequency
+            if (i + 1) % self.cfg.actor_update_freq == 0:
+                # Collect batches for actor update (from current position back by actor_update_freq)
+                actor_batch_start = max(0, i + 1 - self.cfg.actor_update_freq)
+                actor_batches = mini_batches[actor_batch_start:i + 1]
+                
+                # Combine the batches for actor update
+                combined_batch = {}
+                for key in actor_batches[0].keys():
+                    combined_batch[key] = np.concatenate([batch_dict[key] for batch_dict in actor_batches], axis=0)
+                
+                entropy = self.ActorCritic.updateActor(TimeStep(**combined_batch))
+                entropy = entropy.detach()
+                
+                if self.cfg.learnable_temp:
+                    self.ActorCritic.updateTemp(entropy, self.cfg.target_entropy)
         
 
     def state_dict(self, with_buffer=False):

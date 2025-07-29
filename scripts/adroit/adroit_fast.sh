@@ -1,4 +1,5 @@
 #!/bin/bash
+export MUJOCO_GL=egl
 
 seeds=(1014) #2937 5382 4785 7913)
 demos=5
@@ -8,7 +9,6 @@ for seed in "${seeds[@]}"
 do
     XLA_PYTHON_CLIENT_PREALLOCATE=false python trainTorch.py configs/adroit/sac_adroit_${env}.yml \
         logger.exp_name="adroit/${env}/${name_prefix}_${demos}_demos_s${seed}" \
-        logger.wandb=False \
         train.num_demos=${demos} \
         seed=${seed} \
         train.steps=2000000

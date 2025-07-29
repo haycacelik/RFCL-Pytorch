@@ -28,8 +28,11 @@ from rfclTorch.models import NetworkConfig, build_network_from_cfg#to do Defined
 from rfclTorch.utils.parse import parse_cfg#works for now
 from rfclTorch.utils.spaces import get_action_dim#todo
 
+print("using torch")
 
 os.environ["TF_CPP_MIN_LOG_LEVEL"] = "2"
+
+
 
 #*************************************#
 #*****Keeping data classes same*******#
@@ -115,6 +118,8 @@ def main(cfg: SACExperiment):
 
     # Setup training and evaluation environment configs
     env_cfg = cfg.env
+    print("----------------here-----------------")
+    print(f"env_cfg: {cfg.logger}")
     if "env_kwargs" not in env_cfg:
         env_cfg["env_kwargs"] = dict()
     cfg.eval_env = {**env_cfg, **cfg.eval_env}

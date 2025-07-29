@@ -11,15 +11,6 @@ import numpy as np
 import torch
 import torch.nn as nn
 import math
-# import flax
-# import flax.linen as nn
-# import jax
-# import jax.numpy as jnp
-# import optax
-# from chex import Array, PRNGKey
-# from flax import struct
-#from tensorflow_probability.substrates import jax as tfp
-
 
 from rfclTorch.agents.sac.config import TimeStep
 
@@ -69,8 +60,6 @@ class Ensemble(nn.Module):
     def sample(self,numSample:int):
         return random.sample(list(self.ensemble),numSample)
     
-        
-
 
 class Critic(nn.Module):
     
@@ -86,6 +75,10 @@ class Critic(nn.Module):
         x = torch.cat([obs, acts],dim= -1)
         features = self.feature_extractor(x)
         value = self.fc(features)
+        # print("critic input shape:", x.shape, "features shape:", features.shape, "value shape:", value.shape)
+        # print("value squeeze shape:", value.squeeze(-1).shape)
+        #critic input shape: torch.Size([256, 69]) features shape: torch.Size([256, 256]) value shape: torch.Size([256, 1])
+        # value squeeze shape: torch.Size([256])
         return value.squeeze(-1)
 
 
@@ -155,6 +148,9 @@ class DiagGaussianActor(nn.Module):
             #dist = tfd.TransformedDistribution(distribution=dist, bijector=tfb.Tanh())
             dist = torch.distributions.TransformedDistribution(dist,TanhTransform())
             #torch doesn't have one built in, add this in a later step!0
+
+        # torch.Size([12]) torch.Size([30])
+        # print(dist.batch_shape,dist.event_shape)
         return dist
 
 
@@ -256,12 +252,9 @@ class ActorCritic(nn.Module):
         nextQ,_ = torch.min(nextQs,dim=0)
         
         targetQ = batch_reward + discount * batch_mask * nextQ
-        
 
         if backup_entropy:
             targetQ -= discount * batch_mask * self.temp() * next_log_probs
-            
-        
           
         Qs = self.critic(batch_next_obs,next_actions)  
 
