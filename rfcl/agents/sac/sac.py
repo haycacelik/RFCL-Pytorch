@@ -83,6 +83,7 @@ class SAC(BasePolicy):
             initialized=False,
         )
 
+        # random move sampler
         def seed_sampler(rng_key):
             return jax.random.uniform(
                 rng_key,

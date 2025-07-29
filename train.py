@@ -17,16 +17,16 @@ import numpy as np
 import optax
 from omegaconf import OmegaConf
 
-from rfcl.agents.sac import SAC, ActorCritic, SACConfig
-from rfcl.agents.sac.networks import DiagGaussianActor
+from rfcl.agents.sac import SAC, ActorCritic, SACConfig #has jax
+from rfcl.agents.sac.networks import DiagGaussianActor #has jax
 from rfcl.data.dataset import ReplayDataset, get_states_dataset
 from rfcl.envs.make_env import EnvConfig, get_initial_state_wrapper, make_env_from_cfg
 from rfcl.envs.wrappers.curriculum import ReverseCurriculumWrapper
-from rfcl.envs.wrappers.forward_curriculum import SeedBasedForwardCurriculumWrapper
+from rfcl.envs.wrappers.forward_curriculum import SeedBasedForwardCurriculumWrapper #has jax
 from rfcl.logger import LoggerConfig
-from rfcl.models import NetworkConfig, build_network_from_cfg
+from rfcl.models import NetworkConfig, build_network_from_cfg #has jax
 from rfcl.utils.parse import parse_cfg
-from rfcl.utils.spaces import get_action_dim
+from rfcl.utils.spaces import get_action_dim 
 
 # added by me
 # just to see if it runs since we cant visualize on the cluster
@@ -34,6 +34,8 @@ os.environ["MUJOCO_GL"] = "egl"
 os.environ["DISPLAY"] = ""
 
 os.environ["TF_CPP_MIN_LOG_LEVEL"] = "2"
+
+print("starting")
 
 
 @dataclass
@@ -129,7 +131,8 @@ def main(cfg: SACExperiment):
             i += 1
         warnings.warn(f"{prev_exp_path} already exists. Changing exp_name to {cfg.logger.exp_name}")
     video_path = osp.join(cfg.logger.workspace, cfg.logger.exp_name, "stage_1_videos")
-
+    
+    # the amount of envs that run at the same time to get data
     cfg.sac.num_envs = cfg.env.num_envs
     cfg.sac.num_eval_envs = cfg.eval_env.num_envs
 
@@ -137,8 +140,10 @@ def main(cfg: SACExperiment):
     if cfg.demo_seed is not None:
         np.random.seed(cfg.demo_seed)
     
+    # get states dataset
     states_dataset = get_states_dataset(cfg.train.dataset_path, num_demos=cfg.train.num_demos, shuffle=cfg.train.shuffle_demos, skip_failed=True)
 
+    # add reward type to 
     if "reward_mode" in cfg.env.env_kwargs:
         reward_mode = cfg.env.env_kwargs["reward_mode"]
     elif "reward_type" in cfg.env.env_kwargs:
@@ -146,6 +151,7 @@ def main(cfg: SACExperiment):
     else:
         raise ValueError("reward_mode is not specified")
 
+    # get the replay dataset: picks demos, scales actions
     if cfg.train.train_on_demo_actions:
         demo_replay_dataset = ReplayDataset(
             cfg.train.dataset_path,
@@ -156,11 +162,18 @@ def main(cfg: SACExperiment):
             eps_ids=states_dataset.keys(), # forces the demo replay dataset used as the offline buffer to use the same demos as the reverse curriculum
             data_action_scale=cfg.train.data_action_scale,
         )
+        # if there is an action stacle put it in configs
         if demo_replay_dataset.action_scale is not None:
             env_cfg.action_scale = demo_replay_dataset.action_scale.tolist()
             eval_env_cfg.action_scale = env_cfg.action_scale
+
+    # get the fitting initial state wrapper so we can change it, for example manskill, gymnasium
     InitialStateWrapper = get_initial_state_wrapper(cfg.env.env_id)
+
+    # set the given seed
     np.random.seed(cfg.seed)
+
+    # add reverse curriculum configs
     wrappers = [
         lambda env: InitialStateWrapper(
             env,
@@ -168,7 +181,13 @@ def main(cfg: SACExperiment):
             demo_horizon_to_max_steps_ratio=cfg.train.demo_horizon_to_max_steps_ratio,
         )
     ]
+
+    # make 
     env, env_meta = make_env_from_cfg(env_cfg, seed=cfg.seed, wrappers=wrappers)
+    print("------------------")
+    print(env)
+    print("------------------")
+    print(env_meta)
     eval_env = None
     use_orig_env_for_eval = cfg.train.use_orig_env_for_eval
     if cfg.sac.num_eval_envs > 0:
@@ -241,141 +260,141 @@ def main(cfg: SACExperiment):
         cfg=cfg.sac,
     )
 
-    ###########################################
-    # Stage 1 Training: Reverse Curriculum RL #
-    ###########################################
+#     ###########################################
+#     # Stage 1 Training: Reverse Curriculum RL #
+#     ###########################################
 
-    if cfg.train.train_on_demo_actions:
-        algo.offline_buffer = demo_replay_dataset  # create offline buffer to oversample from
+#     if cfg.train.train_on_demo_actions:
+#         algo.offline_buffer = demo_replay_dataset  # create offline buffer to oversample from
 
-    if not cfg.stage_2_only:
-        def early_stop_fn(locals):
-            # callback function to log reverse curriculum metrics and stop training once reverse curriculum is done
-            nonlocal env, algo
-            logger = algo.logger
-            demo_metadata = env.demo_metadata
-            pts = []
-            solved_frac = 0
-            for k in demo_metadata:
-                pts.append(demo_metadata[k].start_step / (demo_metadata[k].total_steps - 1))
-                solved_frac += int(demo_metadata[k].solved)
-            solved_frac = solved_frac / len(demo_metadata)
-            mean_start_step = np.mean(pts)
-            logger.tb_writer.add_histogram("train_stats/start_step_frac_dist", pts, algo.state.total_env_steps)
-            logger.tb_writer.add_scalar("train_stats/start_step_frac_avg", mean_start_step, algo.state.total_env_steps)
-            if logger.wandb:
-                import wandb as wb
+#     if not cfg.stage_2_only:
+#         def early_stop_fn(locals):
+#             # callback function to log reverse curriculum metrics and stop training once reverse curriculum is done
+#             nonlocal env, algo
+#             logger = algo.logger
+#             demo_metadata = env.demo_metadata
+#             pts = []
+#             solved_frac = 0
+#             for k in demo_metadata:
+#                 pts.append(demo_metadata[k].start_step / (demo_metadata[k].total_steps - 1))
+#                 solved_frac += int(demo_metadata[k].solved)
+#             solved_frac = solved_frac / len(demo_metadata)
+#             mean_start_step = np.mean(pts)
+#             logger.tb_writer.add_histogram("train_stats/start_step_frac_dist", pts, algo.state.total_env_steps)
+#             logger.tb_writer.add_scalar("train_stats/start_step_frac_avg", mean_start_step, algo.state.total_env_steps)
+#             if logger.wandb:
+#                 import wandb as wb
 
-                logger.wandb_run.log(data={"train_stats/start_step_frac_dist": wb.Histogram(pts)}, step=algo.state.total_env_steps)
-                logger.wandb_run.log(data={"train_stats/start_step_frac_avg": mean_start_step}, step=algo.state.total_env_steps)
+#                 logger.wandb_run.log(data={"train_stats/start_step_frac_dist": wb.Histogram(pts)}, step=algo.state.total_env_steps)
+#                 logger.wandb_run.log(data={"train_stats/start_step_frac_avg": mean_start_step}, step=algo.state.total_env_steps)
 
-            if solved_frac > 0.9:
-                print("Reverse solved > 0.9 of demos. Stopping stage 1")
-                return True
-            return False
+#             if solved_frac > 0.9:
+#                 print("Reverse solved > 0.9 of demos. Stopping stage 1")
+#                 return True
+#             return False
 
-        if cfg.stage_1_model_path is None:
-            rng_key, train_rng_key = jax.random.split(jax.random.PRNGKey(cfg.seed), 2)
-            algo.train(
-                rng_key=train_rng_key,
-                steps=cfg.train.steps,
-                callback_fn=early_stop_fn,
-                verbose=cfg.verbose,
-            )
-            algo.save(osp.join(algo.logger.model_path, "stage_1.jx"), with_buffer=True)
-            algo.logger.tb_writer.add_scalar("train_stats/stage_1_steps", algo.state.total_env_steps, algo.state.total_env_steps)
-            if algo.logger.wandb:
-                algo.logger.wandb_run.log(data={"train_stats/stage_1_steps": algo.state.total_env_steps}, step=algo.state.total_env_steps)
-        else:
-            print(f"Loading stage 1 model: {cfg.stage_1_model_path}")
-            algo.load_from_path(cfg.stage_1_model_path)
+#         if cfg.stage_1_model_path is None:
+#             rng_key, train_rng_key = jax.random.split(jax.random.PRNGKey(cfg.seed), 2)
+#             algo.train(
+#                 rng_key=train_rng_key,
+#                 steps=cfg.train.steps,
+#                 callback_fn=early_stop_fn,
+#                 verbose=cfg.verbose,
+#             )
+#             algo.save(osp.join(algo.logger.model_path, "stage_1.jx"), with_buffer=True)
+#             algo.logger.tb_writer.add_scalar("train_stats/stage_1_steps", algo.state.total_env_steps, algo.state.total_env_steps)
+#             if algo.logger.wandb:
+#                 algo.logger.wandb_run.log(data={"train_stats/stage_1_steps": algo.state.total_env_steps}, step=algo.state.total_env_steps)
+#         else:
+#             print(f"Loading stage 1 model: {cfg.stage_1_model_path}")
+#             algo.load_from_path(cfg.stage_1_model_path)
 
-    if cfg.stage_1_only:
-        exit()
+#     if cfg.stage_1_only:
+#         exit()
 
-    ###############################
-    # Stage 2 Training: Normal RL with Forward Curriculums #
-    ###############################
-    print("Stage 2 Training starting")
-    # Optionally load actor/critic networks from stage 1 of training
-    ac = create_ac_model()
-    if cfg.train.load_actor:
-        ac = ac.load(algo.state.ac.state_dict(), load_critic=cfg.train.load_critic)
-        algo.state = algo.state.replace(ac=ac)
+#     ###############################
+#     # Stage 2 Training: Normal RL with Forward Curriculums #
+#     ###############################
+#     print("Stage 2 Training starting")
+#     # Optionally load actor/critic networks from stage 1 of training
+#     ac = create_ac_model()
+#     if cfg.train.load_actor:
+#         ac = ac.load(algo.state.ac.state_dict(), load_critic=cfg.train.load_critic)
+#         algo.state = algo.state.replace(ac=ac)
 
-    if not cfg.stage_2_only:
-        # if not stage 2 only, there is a stage 1 replay buffer we can use
-        # Load previous model's replay buffer as a separate offline buffer to sample from or directly into the online buffer
-        if cfg.train.load_as_offline_buffer:
-            print(
-                f"Loading replay buffer as offline buffer which contains {algo.replay_buffer.size() * algo.replay_buffer.num_envs} interactions. Reset online buffer"
-            )
-            algo.offline_buffer = copy.deepcopy(algo.replay_buffer)
-            algo.replay_buffer.reset()
-        if cfg.train.load_as_online_buffer:
-            print(
-                f"Loading replay buffer into online buffer which contains {algo.replay_buffer.size() * algo.replay_buffer.num_envs} interactions. No offline buffer"
-            )
-            algo.offline_buffer = None
+#     if not cfg.stage_2_only:
+#         # if not stage 2 only, there is a stage 1 replay buffer we can use
+#         # Load previous model's replay buffer as a separate offline buffer to sample from or directly into the online buffer
+#         if cfg.train.load_as_offline_buffer:
+#             print(
+#                 f"Loading replay buffer as offline buffer which contains {algo.replay_buffer.size() * algo.replay_buffer.num_envs} interactions. Reset online buffer"
+#             )
+#             algo.offline_buffer = copy.deepcopy(algo.replay_buffer)
+#             algo.replay_buffer.reset()
+#         if cfg.train.load_as_online_buffer:
+#             print(
+#                 f"Loading replay buffer into online buffer which contains {algo.replay_buffer.size() * algo.replay_buffer.num_envs} interactions. No offline buffer"
+#             )
+#             algo.offline_buffer = None
 
-    # Switch environments from the reverse curriculum environments to a normal environment
-    env.close(), eval_env.close()
+#     # Switch environments from the reverse curriculum environments to a normal environment
+#     env.close(), eval_env.close()
 
-    video_path = osp.join(cfg.logger.workspace, cfg.logger.exp_name, "stage_2_videos")
-    wrappers = []
-    if cfg.train.data_action_scale is not None:
-        rescale_action_wrapper = lambda x: gym.wrappers.RescaleAction(x, -demo_replay_dataset.action_scale, demo_replay_dataset.action_scale)
-        clip_wrapper = lambda x: gym.wrappers.ClipAction(x)
-        wrappers += [rescale_action_wrapper, clip_wrapper]
+#     video_path = osp.join(cfg.logger.workspace, cfg.logger.exp_name, "stage_2_videos")
+#     wrappers = []
+#     if cfg.train.data_action_scale is not None:
+#         rescale_action_wrapper = lambda x: gym.wrappers.RescaleAction(x, -demo_replay_dataset.action_scale, demo_replay_dataset.action_scale)
+#         clip_wrapper = lambda x: gym.wrappers.ClipAction(x)
+#         wrappers += [rescale_action_wrapper, clip_wrapper]
 
-    env, env_meta = make_env_from_cfg(env_cfg, seed=cfg.seed, wrappers=wrappers)
-    eval_env = None
-    if cfg.sac.num_eval_envs > 0:
-        eval_wrappers = []
-        if cfg.train.data_action_scale is not None:
-            eval_wrappers += [rescale_action_wrapper, clip_wrapper]
-        eval_env, _ = make_env_from_cfg(
-            eval_env_cfg,
-            seed=cfg.seed + 1_000_000,
-            video_path=video_path if cfg.save_eval_video else None,
-            wrappers=eval_wrappers,
-        )
+#     env, env_meta = make_env_from_cfg(env_cfg, seed=cfg.seed, wrappers=wrappers)
+#     eval_env = None
+#     if cfg.sac.num_eval_envs > 0:
+#         eval_wrappers = []
+#         if cfg.train.data_action_scale is not None:
+#             eval_wrappers += [rescale_action_wrapper, clip_wrapper]
+#         eval_env, _ = make_env_from_cfg(
+#             eval_env_cfg,
+#             seed=cfg.seed + 1_000_000,
+#             video_path=video_path if cfg.save_eval_video else None,
+#             wrappers=eval_wrappers,
+#         )
 
-    print(f"Forward curriculum: {cfg.train.forward_curriculum}")
-    if cfg.train.forward_curriculum is not None and cfg.train.forward_curriculum != "None":
-        env = SeedBasedForwardCurriculumWrapper(
-            env,
-            score_transform=cfg.train.score_transform,
-            score_temperature=cfg.train.score_temperature,
-            staleness_transform=cfg.train.staleness_transform,
-            staleness_temperature=cfg.train.staleness_temperature,
-            staleness_coef=cfg.train.staleness_coef,
-            score_fn=cfg.train.forward_curriculum,
-            rho=0,
-            nu=0.95,
-            num_seeds=cfg.train.num_seeds,
-        )
-        env.reset(seed=cfg.seed)
-    algo.setup_envs(env, eval_env)
-    algo.state = algo.state.replace(initialized=False)
+#     print(f"Forward curriculum: {cfg.train.forward_curriculum}")
+#     if cfg.train.forward_curriculum is not None and cfg.train.forward_curriculum != "None":
+#         env = SeedBasedForwardCurriculumWrapper(
+#             env,
+#             score_transform=cfg.train.score_transform,
+#             score_temperature=cfg.train.score_temperature,
+#             staleness_transform=cfg.train.staleness_transform,
+#             staleness_temperature=cfg.train.staleness_temperature,
+#             staleness_coef=cfg.train.staleness_coef,
+#             score_fn=cfg.train.forward_curriculum,
+#             rho=0,
+#             nu=0.95,
+#             num_seeds=cfg.train.num_seeds,
+#         )
+#         env.reset(seed=cfg.seed)
+#     algo.setup_envs(env, eval_env)
+#     algo.state = algo.state.replace(initialized=False)
 
-    (
-        rng_key,
-        train_rng_key,
-    ) = jax.random.split(jax.random.PRNGKey(cfg.seed), 2)
+#     (
+#         rng_key,
+#         train_rng_key,
+#     ) = jax.random.split(jax.random.PRNGKey(cfg.seed), 2)
 
-    # we seed with policy in stage 2 for algo.cfg.num_seed_steps
-    algo.cfg.seed_with_policy = True
-    algo.cfg.num_seed_steps = algo.state.total_env_steps + algo.cfg.num_seed_steps
-    print(f"Seeding until {algo.cfg.num_seed_steps}")
-    algo.train(
-        rng_key=train_rng_key,
-        steps=cfg.train.steps - algo.state.total_env_steps,
-        verbose=cfg.verbose,
-    )
-    algo.save(osp.join(algo.logger.model_path, "latest.jx"), with_buffer=False)
+#     # we seed with policy in stage 2 for algo.cfg.num_seed_steps
+#     algo.cfg.seed_with_policy = True
+#     algo.cfg.num_seed_steps = algo.state.total_env_steps + algo.cfg.num_seed_steps
+#     print(f"Seeding until {algo.cfg.num_seed_steps}")
+#     algo.train(
+#         rng_key=train_rng_key,
+#         steps=cfg.train.steps - algo.state.total_env_steps,
+#         verbose=cfg.verbose,
+#     )
+#     algo.save(osp.join(algo.logger.model_path, "latest.jx"), with_buffer=False)
 
 
-if __name__ == "__main__":
-    cfg = parse_cfg(default_cfg_path=sys.argv[1])
-    main(cfg)
+# if __name__ == "__main__":
+#     cfg = parse_cfg(default_cfg_path=sys.argv[1])
+#     main(cfg)

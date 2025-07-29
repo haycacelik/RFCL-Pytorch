@@ -9,7 +9,7 @@
 echo "Starting training experiments"
 
 # Activate conda
-source /work/dlclarge2/celikh-nr1-ayca/miniconda3/etc/profile.d/conda.sh
+source /work/dlclacrge2/celikh-nr1-ayca/miniconda3/etc/profile.d/conda.sh
 conda activate rfcl
 
 bash /work/dlclarge2/celikh-nr1-ayca/RFCL-Pytorch/scripts/adroit/adroit_fast.sh

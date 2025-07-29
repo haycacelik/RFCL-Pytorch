@@ -1,12 +1,10 @@
 import time
+import pickle
 from collections import defaultdict
-from typing import Any, Callable, Tuple
+from typing import Any, Callable, Tuple, Union, Optional
 
-import flax
-import jax
-import jax.numpy as jnp
-import numpy as npzz
-from chex import PRNGKey
+import torch
+import numpy as np
 # from gymnasium.wrappers.record_video import RecordVideo
 
 from rfcl.data.loop import (
@@ -18,8 +16,19 @@ from rfcl.data.loop import (
     GymLoop,
 )
 from rfcl.logger.logger import Logger, LoggerConfig
-from rfcl.models.model import Params
 from rfcl.utils.spaces import get_action_dim, get_obs_shape
+
+
+def tree_map_to_numpy(data):
+    """Recursively convert tensors to numpy arrays (PyTorch equivalent of jax.tree_map)"""
+    if isinstance(data, torch.Tensor):
+        return data.detach().cpu().numpy()
+    elif isinstance(data, dict):
+        return {k: tree_map_to_numpy(v) for k, v in data.items()}
+    elif isinstance(data, (list, tuple)):
+        return type(data)(tree_map_to_numpy(item) for item in data)
+    else:
+        return np.array(data) if hasattr(data, '__array__') else data
 
 
 class BasePolicy:
@@ -39,7 +48,6 @@ class BasePolicy:
         """
         assert env is not None
         self.env_type = env_type
-        # self.jax_env = env_type == "jax"
         self.num_envs = num_envs
         self.num_eval_envs = num_eval_envs
         self.setup_envs(env, eval_env)
@@ -89,27 +97,27 @@ class BasePolicy:
         """
         state_dict = self.state_dict()
         with open(save_path, "wb") as f:
-            f.write(flax.serialization.to_bytes(state_dict))
-        # torch.save(state_dict, save_path)
+            pickle.dump(state_dict, f)
+        # Alternative: torch.save(state_dict, save_path)
 
     def load(self, data):
         raise NotImplementedError
 
     def load_from_path(self, load_path: str):
         with open(load_path, "rb") as f:
-            data = flax.serialization.from_bytes(self.state_dict(), f.read())
-        # data = torch.load(load_path, map_location='cpu')
+            data = pickle.load(f)
+        # Alternative: data = torch.load(load_path, map_location='cpu')
         self.load(data)
         return self
 
     def evaluate(
         self,
-        rng_key: PRNGKey,
+        rng_seed: Optional[int],
         num_envs: int,
         steps_per_env: int,
         eval_loop: BaseEnvLoop,
-        params: Params,
-        apply_fn: Callable[[PRNGKey, EnvObs], EnvAction],
+        params: Any,  # Could be model parameters, state dict, etc.
+        apply_fn: Callable[[Optional[int], EnvObs], EnvAction],
         progress_bar: bool = False,
     ):
         """
@@ -119,9 +127,15 @@ class BasePolicy:
 
         Will use the provided logger and store the evaluation returns, episode lengths, and log it all. Furthermore logs any data stored in info["stats"]
         """
-        rng_key, *eval_rng_keys = jax.random.split(rng_key, num_envs + 1)
+        # Generate random seeds for each environment
+        if rng_seed is not None:
+            np.random.seed(rng_seed)
+            eval_rng_keys = [np.random.randint(0, 2**31) for _ in range(num_envs)]
+        else:
+            eval_rng_keys = [None] * num_envs
+            
         eval_buffer, _ = eval_loop.rollout(
-            rng_keys=jnp.stack(eval_rng_keys),
+            rng_keys=np.array(eval_rng_keys),
             loop_state=None,  # set to None means this eval_loop will generate its own loop state
             params=params,
             apply_fn=apply_fn,
@@ -133,7 +147,7 @@ class BasePolicy:
         del eval_buffer["final_info"]
         if isinstance(eval_buffer, dict):
             eval_buffer = DefaultTimeStep(**eval_buffer)
-        eval_buffer: DefaultTimeStep = jax.tree_map(lambda x: np.array(x), eval_buffer)
+        eval_buffer: DefaultTimeStep = tree_map_to_numpy(eval_buffer)
         eval_episode_ends = eval_buffer.truncated | eval_buffer.terminated
         eval_ep_rets = eval_buffer.ep_ret[eval_episode_ends].flatten()
         eval_ep_lens = eval_buffer.ep_len[eval_episode_ends].flatten()
