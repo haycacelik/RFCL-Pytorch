@@ -322,7 +322,7 @@ class ReverseCurriculumWrapper(VectorEnvWrapper):
                 link_env.global_success_rate_history = create_filled_deque(self.per_demo_buffer_size * len(self.states_dataset), 0)
                 link_env.sync_envs()
 
-    def step_wait(self):
+    def step_wait(self): 
         observation, reward, terminated, truncated, info = super().step_wait()
         if terminated.any() or truncated.any():
             for final_info, exists in zip(info["final_info"], info["_final_info"]):
@@ -340,6 +340,7 @@ class ReverseCurriculumWrapper(VectorEnvWrapper):
                     self.global_success_rate_history.append(int(success))
             if not self.eval_mode:
                 self.step_curriculum()
+                print(f"curriculum stepped!")
         return observation, reward, terminated, truncated, info
 
     def step_curriculum(self):

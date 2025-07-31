@@ -118,5 +118,8 @@ $RECYCLE.BIN/
 wandb/
 
 
-.mp4
-.jx
+*.mp4
+*.jx
+*.err
+*.out
+*tfevents.*

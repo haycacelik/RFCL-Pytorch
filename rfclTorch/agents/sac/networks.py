@@ -192,8 +192,8 @@ class ActorCritic(nn.Module):
     # Shoud probably create adam optimizers instead of taking optim inputs in the beginning
         self.actor=actor
         self.critic=Ensemble(critic,num_qs)
-        self.target_critic=Ensemble(critic,num_qs or num_min_qs)
-        self.target_critic.load_state_dict(critic.state_dict())
+        self.target_critic=Ensemble(critic,num_qs)# or num_min_qs)
+        self.target_critic.load_state_dict(self.critic.state_dict())
         self.temp=temp
         self.sample_obs=sample_obs
         self.sample_acts=sample_acts
