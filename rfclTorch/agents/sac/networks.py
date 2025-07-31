@@ -255,9 +255,9 @@ class ActorCritic(nn.Module):
         randomTargetsCritic =  self.target_critic.sample(numSample)
         nextQs = [mod(batch_next_obs,next_actions) for mod in randomTargetsCritic]
         nextQs = torch.stack(nextQs,dim=0)
-        
+        #print(f"nextQs: {nextQs.shape}")
         nextQ,_ = torch.min(nextQs,dim=0)
-        
+        #print(f"nextQ min:{nextQ.shape}")
         targetQ = batch_reward + discount * batch_mask * nextQ
         
 
@@ -267,14 +267,14 @@ class ActorCritic(nn.Module):
         
           
         Qs = self.critic(batch_env_obs,batch_action)  
-
+        #print(f"Qs: {Qs.shape}")
         targetQ = targetQ.unsqueeze(0).expand_as(Qs)
         
         loss = self.criticLoss(Qs,targetQ)
         loss.backward()
         self.critic_optim.step()
        #print(f"Qs shape: {Qs.shape}")
-        return loss.item(),torch.mean(Qs,dim=0)
+        return loss.item(),Qs.mean()
         
 
     def updateActor(self,batch: TimeStep):

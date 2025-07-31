@@ -315,6 +315,7 @@ class Logger:
                             self.save_fn(osp.join(self.model_path, f"best_{fmt_name}_ckpt.jx"))
                             # print(f"{name} new best at {step}: {scalar}")
                     if self.tensorboard and not local_only:
+                        #print(f"logging name:{name}, scalar:{scalar}")
                         self.tb_writer.add_scalar(name, scalar, self.start_step + step)
                     self.stats[name] = scalar
                 if self.wandb and not local_only:

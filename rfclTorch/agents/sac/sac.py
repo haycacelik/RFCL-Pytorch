@@ -133,6 +133,7 @@ class SAC(BasePolicy):
         """
         train_start_time = time.time()
 
+        print(f"training started!, seed steps: {self.cfg.num_seed_steps}")
         # if env_obs is None, then this is the first time calling train and we prepare the environment
         if not self.state.initialized:
             self.state.loop_state = self.loop.reset_loop()
@@ -147,6 +148,7 @@ class SAC(BasePolicy):
 
         while self.state.total_env_steps < start_step + steps:
 
+            #print("started")
             #change this to not have to pass self.state!
             train_step_metrics = self.train_step()
 
@@ -197,6 +199,7 @@ class SAC(BasePolicy):
                     **train_step_metrics.time,
                 )
             # log and export the metrics
+            #print(f"total steps: {self.state.total_env_steps}, type: {type(self.state.total_env_steps)}")
             self.logger.log(self.state.total_env_steps)
             self.logger.reset()
 
@@ -255,7 +258,7 @@ class SAC(BasePolicy):
                 # note for continuous task wrapped envs where there is no early done, all envs finish at the same time unless
                 # they are staggered. So masks is never false.
                 # if you want to always value bootstrap set masks to true.
-                print("dones!")#debug print
+                #print("dones!")#debug print
                 train_metrics["return"].append(data.ep_ret[dones])
                 train_metrics["episode_len"].append(data.ep_len[dones])
                 
@@ -291,9 +294,10 @@ class SAC(BasePolicy):
         # update policy
         #print(f"rollout done, time {rollout_time}")
         update = dict()
+        # print(f"self.state")
         if self.state.total_env_steps >= self.cfg.num_seed_steps:
             update_time_start = time.time()
-            
+            #print("seed steps done!")
             if self.offline_buffer is not None:
                 #removed key argument as it isnt used anyways!
                 batch = self.replay_buffer.sample_random_batch(self.cfg.batch_size * self.cfg.grad_updates_per_step // 2)
@@ -306,13 +310,14 @@ class SAC(BasePolicy):
             update = self.update_parameters(batch)
             #shouldn't need this since the sae actor-critic should update it's weights
             training_steps = training_steps + self.cfg.grad_updates_per_step
+            #print(f"training steps: {training_steps}")
             
             update_time = time.time() - update_time_start
             time_metrics["update_time"] = update_time
             #print(f"done training step, time : {update_time}")
 
         self.state.loop_state = loop_state
-        self.total_env_steps = total_env_steps + self.cfg.num_envs * self.cfg.steps_per_env
+        self.state.total_env_steps = total_env_steps + self.cfg.num_envs * self.cfg.steps_per_env
         self.state.training_steps = training_steps
         
         

@@ -340,7 +340,7 @@ class ReverseCurriculumWrapper(VectorEnvWrapper):
                     self.global_success_rate_history.append(int(success))
             if not self.eval_mode:
                 self.step_curriculum()
-                print(f"curriculum stepped!")
+                #print(f"curriculum stepped!")
         return observation, reward, terminated, truncated, info
 
     def step_curriculum(self):
