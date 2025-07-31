@@ -406,7 +406,7 @@ class GymLoop(BaseEnvLoop):
 #         params: Any,
 #         apply_fn: Callable[[PRNGKey, Any, EnvObs], Tuple[EnvAction, Any]],
 #         steps_per_env: int,
-#         progress_bar: bool = False,  # unused
+#         progress_0: bool = False,  # unused
 #     ) -> Tuple[Any, EnvLoopState]:
 #         """
 #         Rollout across N parallelized environments with an actor function apply_fn and

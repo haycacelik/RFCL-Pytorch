@@ -25,9 +25,9 @@ from rfclTorch.utils import tools
 class TrainStepMetrics:
     train_stats: Any
     train: Any
-    update: Any
     time: Any
-
+    update: Any
+#add update aux again
 
 @dataclass
 class SACTrainState:
@@ -99,6 +99,7 @@ class SAC(BasePolicy):
             buffer_config["env_obs"] = (self.obs_shape, np.float32)
         buffer_config["next_env_obs"] = buffer_config["env_obs"]
 
+        print({"buffer config: {buffer_config}"})
         self.replay_buffer = GenericBuffer(
             buffer_size=self.cfg.replay_buffer_capacity,
             num_envs=self.cfg.num_envs,
@@ -118,7 +119,7 @@ class SAC(BasePolicy):
     def _det_action(self,env_obs):
         return self.ActorCritic.act(env_obs,True), {}
 
-    def _env_step(self, loop_state: EnvLoopState, actor: DiagGaussianActor, seed=False):
+    def _env_step(self, loop_state: EnvLoopState):
 
         data, loop_state = self.loop.rollout(loop_state, partial(self._sample_action), 1)
         return loop_state, data
@@ -132,16 +133,10 @@ class SAC(BasePolicy):
         """
         train_start_time = time.time()
 
-
-
         # if env_obs is None, then this is the first time calling train and we prepare the environment
         if not self.state.initialized:
-            loop_state = self.loop.reset_loop()
-            self.state = replace(
-                self.state,
-                loop_state=loop_state,
-                initialized=True,
-            )
+            self.state.loop_state = self.loop.reset_loop()
+            self.state.initialized = True
 
         start_step = self.state.total_env_steps
 
@@ -152,7 +147,8 @@ class SAC(BasePolicy):
 
         while self.state.total_env_steps < start_step + steps:
 
-            self.state, train_step_metrics = self.train_step(self.state)
+            #change this to not have to pass self.state!
+            train_step_metrics = self.train_step()
 
             # evaluate the current trained actor periodically
             if (
@@ -160,7 +156,11 @@ class SAC(BasePolicy):
                 and tools.reached_freq(self.state.total_env_steps, self.cfg.eval_freq, step_size=env_rollout_size)
                 and self.state.total_env_steps > self.cfg.num_seed_steps
             ):
-
+                
+                print("evaluate Called!")
+                self.ActorCritic.eval()
+                
+                
                 eval_results = self.evaluate(
                     num_envs=self.cfg.num_eval_envs,
                     steps_per_env=self.cfg.eval_steps,
@@ -213,7 +213,7 @@ class SAC(BasePolicy):
                     print(f"Early stopping at {self.state.total_env_steps} env steps")
                     break
 
-    def train_step(self, state: SACTrainState) -> Tuple[SACTrainState, TrainStepMetrics]:
+    def train_step(self)-> TrainStepMetrics:# state: SACTrainState)
         """
         Perform a single training step
 
@@ -221,11 +221,13 @@ class SAC(BasePolicy):
         then performing gradient updates
 
         """
-
+        self.ActorCritic.train()
+        
+        
         ac = self.ActorCritic
-        loop_state = state.loop_state
-        total_env_steps = state.total_env_steps
-        training_steps = state.training_steps
+        loop_state = self.state.loop_state
+        total_env_steps = self.state.total_env_steps
+        training_steps = self.state.training_steps
 
         train_custom_stats = defaultdict(list)
         train_metrics = defaultdict(list)
@@ -235,11 +237,7 @@ class SAC(BasePolicy):
         # TODO make this buffer collection jittable
         rollout_time_start = time.time()
         for _ in range(self.cfg.steps_per_env):
-            (next_loop_state, data) = self._env_step(
-                loop_state,
-                ac.actor,
-                seed=(total_env_steps <= self.cfg.num_seed_steps and not (self.cfg.seed_with_policy)),
-            )
+            (next_loop_state, data) = self._env_step(loop_state)
 
             final_infos = data[
                 "final_info"
@@ -257,6 +255,7 @@ class SAC(BasePolicy):
                 # note for continuous task wrapped envs where there is no early done, all envs finish at the same time unless
                 # they are staggered. So masks is never false.
                 # if you want to always value bootstrap set masks to true.
+                print("dones!")#debug print
                 train_metrics["return"].append(data.ep_ret[dones])
                 train_metrics["episode_len"].append(data.ep_len[dones])
                 
@@ -288,14 +287,10 @@ class SAC(BasePolicy):
         rollout_time = time.time() - rollout_time_start
         time_metrics["rollout_time"] = rollout_time
         time_metrics["rollout_fps"] = self.cfg.num_envs * self.cfg.steps_per_env / rollout_time
-        state = replace(
-            self.state,
-            loop_state=loop_state,
-            total_env_steps=total_env_steps + self.cfg.num_envs * self.cfg.steps_per_env,
-        )
+
         # update policy
         #print(f"rollout done, time {rollout_time}")
-        update_aux = dict()
+        update = dict()
         if self.state.total_env_steps >= self.cfg.num_seed_steps:
             update_time_start = time.time()
             
@@ -308,17 +303,22 @@ class SAC(BasePolicy):
                 batch = self.replay_buffer.sample_random_batch( self.cfg.batch_size * self.cfg.grad_updates_per_step)
 
             batch = TimeStep(**batch)
-            self.update_parameters(batch)
+            update = self.update_parameters(batch)
             #shouldn't need this since the sae actor-critic should update it's weights
-            state.training_steps = training_steps + self.cfg.grad_updates_per_step
+            training_steps = training_steps + self.cfg.grad_updates_per_step
             
             update_time = time.time() - update_time_start
             time_metrics["update_time"] = update_time
             #print(f"done training step, time : {update_time}")
 
+        self.state.loop_state = loop_state
+        self.total_env_steps = total_env_steps + self.cfg.num_envs * self.cfg.steps_per_env
+        self.state.training_steps = training_steps
         
-        return state, TrainStepMetrics(time=time_metrics, train=train_metrics, update=update_aux, train_stats=train_custom_stats)
+        
+        return TrainStepMetrics(time=time_metrics, train=train_metrics, train_stats=train_custom_stats, update = update)
 
+    #add update metrics here
     def update_parameters(self,batch:TimeStep):
         
         def split_batch(batch: TimeStep, num_splits: int) -> list[dict[str, np.ndarray]]:
@@ -334,7 +334,12 @@ class SAC(BasePolicy):
         assert self.cfg.grad_updates_per_step % self.cfg.actor_update_freq == 0
         update_rounds = self.cfg.grad_updates_per_step // self.cfg.actor_update_freq
         grad_updates_per_round = self.cfg.grad_updates_per_step // update_rounds
-        
+        q = 0
+        temp=0
+        criticLoss = 0
+        actorLoss = 0
+        tempLoss = 0
+        update = dict()
         #mini_batches = tools.tree_map(lambda x: np.array(np.split(x, update_rounds)), batch)
         mini_batches = split_batch(batch, update_rounds)
         for miniBatch in mini_batches:
@@ -342,13 +347,21 @@ class SAC(BasePolicy):
             roundBatches = split_batch(TimeStep(**miniBatch), grad_updates_per_round)
             
             for roundBatch in roundBatches:
-                self.ActorCritic.updateCritic(TimeStep(**roundBatch),self.cfg.discount, self.cfg.backup_entropy, self.cfg.num_min_qs)
+                criticLoss,q = self.ActorCritic.updateCritic(TimeStep(**roundBatch),self.cfg.discount, self.cfg.backup_entropy, self.cfg.num_min_qs)
                 self.ActorCritic.updateTarget(self.cfg.tau)
-            entropy = self.ActorCritic.updateActor(TimeStep(**miniBatch))
+            actorLoss,entropy = self.ActorCritic.updateActor(TimeStep(**miniBatch))
             entropy = entropy.detach()
             if self.cfg.learnable_temp:
-                self.ActorCritic.updateTemp(entropy,self.cfg.target_entropy)
+                tempLoss, temp = self.ActorCritic.updateTemp(entropy,self.cfg.target_entropy)
+                
+        update["actor/actor_loss"] = actorLoss
+        update["actor/entropy"] = entropy
+        update["critic/critic_loss"] = criticLoss
+        update["critic/q"] = q
+        update["temp/temp_loss"] = tempLoss
+        update["temp/temp"] = temp
         
+        return update
         
 
     def state_dict(self, with_buffer=False):

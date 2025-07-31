@@ -54,6 +54,8 @@ class TanhTransform(torch.distributions.Transform):
         # return torch.log1p(-y.pow(2)).abs()
 #what does this even do? Made basic changes
 #less efficient than JAX version, improve later
+
+
 class Ensemble(nn.Module):
 
     def __init__(self,mod:nn.Module,num:int):
@@ -191,7 +193,7 @@ class ActorCritic(nn.Module):
         self.actor=actor
         self.critic=Ensemble(critic,num_qs)
         self.target_critic=Ensemble(critic,num_qs or num_min_qs)
-        target_critic.load_state_dict(critic.state_dict())
+        self.target_critic.load_state_dict(critic.state_dict())
         self.temp=temp
         self.sample_obs=sample_obs
         self.sample_acts=sample_acts
@@ -242,7 +244,8 @@ class ActorCritic(nn.Module):
         batch_next_obs = torch.tensor(batch.next_env_obs,device=self.device,dtype=torch.float32)
         batch_reward = torch.tensor(batch.reward,device=self.device,dtype=torch.float32)
         batch_mask = torch.tensor(batch.mask,device=self.device,dtype=torch.float32)
-        
+        batch_env_obs = torch.tensor(batch.env_obs,device=self.device,dtype=torch.float32)
+        batch_action = torch.tensor(batch.action,device=self.device,dtype=torch.float32)
         self.critic_optim.zero_grad()
         
         dist = self.actor(batch_next_obs)
@@ -263,13 +266,15 @@ class ActorCritic(nn.Module):
             
         
           
-        Qs = self.critic(batch_next_obs,next_actions)  
+        Qs = self.critic(batch_env_obs,batch_action)  
 
         targetQ = targetQ.unsqueeze(0).expand_as(Qs)
         
-        loss = self.criticLoss(Qs,targetQ)#might have issues with shape here!
+        loss = self.criticLoss(Qs,targetQ)
         loss.backward()
         self.critic_optim.step()
+       #print(f"Qs shape: {Qs.shape}")
+        return loss.item(),torch.mean(Qs,dim=0)
         
 
     def updateActor(self,batch: TimeStep):
@@ -281,11 +286,11 @@ class ActorCritic(nn.Module):
         log_probs = dist.log_prob(actions)
         Qs = self.critic(batch_env_obs,actions)
         Q = torch.mean(Qs,dim=0)
-        
+        Q = Q.detach()
         loss = torch.mean(log_probs * self.temp() - Q)
         loss.backward()
         self.actor_optim.step()
-        return -log_probs.mean()
+        return loss.item(),-log_probs.mean()
         
     def updateTemp(self,entropy: float, target_entropy:float):
         self.temperature_optim.zero_grad()
@@ -293,10 +298,9 @@ class ActorCritic(nn.Module):
         loss = temperature * (entropy - target_entropy).mean()
         loss.backward()
         self.temperature_optim.step()
+        return loss.item(),temperature
         
     def updateTarget(self, tau:float):
          for target_param, main_param in zip(self.target_critic.parameters(), self.critic.parameters()):
             target_param.data.copy_(tau * main_param.data + (1.0 - tau) * target_param.data)
         
-    def updateParams(self):#use a function here to update the model!
-        raise NotImplementedError
