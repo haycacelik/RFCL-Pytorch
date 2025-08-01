@@ -355,7 +355,7 @@ class SAC(BasePolicy):
                 criticLoss,q = self.ActorCritic.updateCritic(TimeStep(**roundBatch),self.cfg.discount, self.cfg.backup_entropy, self.cfg.num_min_qs)
                 self.ActorCritic.updateTarget(self.cfg.tau)
             actorLoss,entropy = self.ActorCritic.updateActor(TimeStep(**miniBatch))
-            entropy = entropy.detach()
+            
             if self.cfg.learnable_temp:
                 tempLoss, temp = self.ActorCritic.updateTemp(entropy,self.cfg.target_entropy)
                 

@@ -237,8 +237,8 @@ def main(cfg: SACExperiment):
             feature_extractor=build_network_from_cfg(cfg.network.critic),
             in_dims=cfg.network.critic.arch_cfg["features"][-1]
         )
-        
-        temp = Temperature()
+        print(f"inital temp: {cfg.sac.initial_temperature}")
+        temp = Temperature(cfg.sac.initial_temperature)
         
         ac = ActorCritic(
             actor = actor,

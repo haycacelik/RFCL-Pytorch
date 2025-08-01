@@ -39,7 +39,7 @@ class TanhTransform(torch.distributions.Transform):
 
     def _call(self, x):
         # Forward transform: tanh
-        return x.tanh()
+        return torch.tanh(x)
 
     def _inverse(self, y):
         # Inverse transform: arctanh
@@ -49,9 +49,9 @@ class TanhTransform(torch.distributions.Transform):
 
     def log_abs_det_jacobian(self, x, y):
         # Jacobian of tanh is 1 - tanh(x)^2 = 1 - y^2
-        return 2.0 * (math.log(2) - x - torch.nn.functional.softplus(-2.0 * x))
+        #return 2.0 * (math.log(2) - x - torch.nn.functional.softplus(-2.0 * x))
         # Alternative simpler:
-        # return torch.log1p(-y.pow(2)).abs()
+         return torch.log1p(-y.pow(2)).abs()
 #what does this even do? Made basic changes
 #less efficient than JAX version, improve later
 
@@ -124,6 +124,7 @@ class DiagGaussianActor(nn.Module):
            # self.log_std = nn.Dense(self.act_dims, kernel_init=default_init(1))
             #check if some custom init needed, probably not since default was used
             self.log_std = nn.Linear(self.in_dims,self.act_dims)
+            nn.init.orthogonal_(self.log_std.weight,gain=1.0)
         else:
             self.log_std = nn.Parameter(torch.zeros(self.act_dims))
 
@@ -132,6 +133,7 @@ class DiagGaussianActor(nn.Module):
         
         #might require different input dimensions!
         self.action_head = nn.Linear(self.in_dims,self.act_dims)
+        nn.init.orthogonal_(self.action_head.weight,gain=1.0)
 
     def forward(self, x, deterministic=False):
 
@@ -140,12 +142,12 @@ class DiagGaussianActor(nn.Module):
         
         #why are their two calls if determinsitc?
         if not self.tanh_squash_distribution:
-            a = nn.Tanh()(a)
+            a = torch.tanh(a)
         if deterministic:
-            return nn.Tanh()(a)
+            return torch.tanh(a)
         if self.state_dependent_std:
             log_std = self.log_std(x)
-            log_std = nn.Tanh()(log_std)
+            log_std = torch.tanh(log_std)
         else:
             log_std = self.log_std
         log_std = self.log_std_range[0] + 0.5 * (self.log_std_range[1] - self.log_std_range[0]) * (log_std + 1)
@@ -248,33 +250,34 @@ class ActorCritic(nn.Module):
         batch_action = torch.tensor(batch.action,device=self.device,dtype=torch.float32)
         self.critic_optim.zero_grad()
         
-        dist = self.actor(batch_next_obs)
-        next_actions = dist.sample()
-        next_log_probs = dist.log_prob(next_actions)#idk if this line will work
+        with torch.no_grad():
+            dist = self.actor(batch_next_obs)
+            next_actions = dist.sample()
+            next_log_probs = dist.log_prob(next_actions)
         
-        randomTargetsCritic =  self.target_critic.sample(numSample)
-        nextQs = [mod(batch_next_obs,next_actions) for mod in randomTargetsCritic]
-        nextQs = torch.stack(nextQs,dim=0)
+            randomTargetsCritic =  self.target_critic.sample(numSample)
+            nextQs = [mod(batch_next_obs,next_actions) for mod in randomTargetsCritic]
+            nextQs = torch.stack(nextQs,dim=0)
         #print(f"nextQs: {nextQs.shape}")
-        nextQ,_ = torch.min(nextQs,dim=0)
+            nextQ,_ = torch.min(nextQs,dim=0)
         #print(f"nextQ min:{nextQ.shape}")
-        targetQ = batch_reward + discount * batch_mask * nextQ
+            targetQ = batch_reward + discount * batch_mask * nextQ
         
 
-        if backup_entropy:
-            targetQ -= discount * batch_mask * self.temp() * next_log_probs
+           if backup_entropy:
+               targetQ -= discount * batch_mask * self.temp() * next_log_probs
             
         
           
         Qs = self.critic(batch_env_obs,batch_action)  
-        #print(f"Qs: {Qs.shape}")
+        print(f"Qs: {Qs.shape}")
         targetQ = targetQ.unsqueeze(0).expand_as(Qs)
-        
+        print(f"targetQ")
         loss = self.criticLoss(Qs,targetQ)
         loss.backward()
         self.critic_optim.step()
        #print(f"Qs shape: {Qs.shape}")
-        return loss.item(),Qs.mean()
+        return loss.item(),Qs.detach().mean()
         
 
     def updateActor(self,batch: TimeStep):
@@ -283,19 +286,24 @@ class ActorCritic(nn.Module):
         self.actor_optim.zero_grad()
         dist = self.act(batch_env_obs)
         actions = dist.sample()
+        #print(f"action dim:{actions.shape}")
         log_probs = dist.log_prob(actions)
         Qs = self.critic(batch_env_obs,actions)
         Q = torch.mean(Qs,dim=0)
-        Q = Q.detach()
-        loss = torch.mean(log_probs * self.temp() - Q)
+        #print(f"Q shape:{Q.shape}")
+        #print(f"log_probs shape:{log_probs.shape}")
+        #print(f"Qs shape: {Qs.shape}")
+        #Q = Q.detach()
+        loss = (log_probs * self.temp() - Q).mean()
         loss.backward()
         self.actor_optim.step()
-        return loss.item(),-log_probs.mean()
+        #print(f"actor_loss: {loss.item()}, entropy:{-log_probs.mean().item()}")
+        return loss.item(),-log_probs.mean().detach().item()
         
     def updateTemp(self,entropy: float, target_entropy:float):
         self.temperature_optim.zero_grad()
         temperature = self.temp()
-        loss = temperature * (entropy - target_entropy).mean()
+        loss = temperature * (entropy - target_entropy)
         loss.backward()
         self.temperature_optim.step()
         return loss.item(),temperature
