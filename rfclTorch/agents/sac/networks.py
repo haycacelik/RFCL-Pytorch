@@ -44,14 +44,15 @@ class TanhTransform(torch.distributions.Transform):
     def _inverse(self, y):
         # Inverse transform: arctanh
         # Clamp input to avoid numerical issues outside (-1, 1)
-        y = y.clamp(min=-0.999999, max=0.999999)
+        y = y.clamp(min=-0.9999999, max=0.9999999)
         return 0.5 * (torch.log1p(y) - torch.log1p(-y))
+    
 
     def log_abs_det_jacobian(self, x, y):
         # Jacobian of tanh is 1 - tanh(x)^2 = 1 - y^2
         #return 2.0 * (math.log(2) - x - torch.nn.functional.softplus(-2.0 * x))
         # Alternative simpler:
-         return torch.log1p(-y.pow(2)).abs()
+        return 2.0 * (math.log(2.0) - torch.abs(x) - torch.nn.functional.softplus(-2.0 * torch.abs(x)))
 #what does this even do? Made basic changes
 #less efficient than JAX version, improve later
 
@@ -264,7 +265,7 @@ class ActorCritic(nn.Module):
             targetQ = batch_reward + discount * batch_mask * nextQ
         
 
-           if backup_entropy:
+            if backup_entropy:
                targetQ -= discount * batch_mask * self.temp() * next_log_probs
             
         
