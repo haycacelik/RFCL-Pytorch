@@ -112,8 +112,7 @@ class SAC(BasePolicy):
 
     def _sample_action(self, env_obs):
  
-        dist = self.ActorCritic.act(env_obs) #define it as a torch distribution(add type guard thing whatever it's called :Type)
-        a = dist.sample()
+        a = self.ActorCritic.act(env_obs) #define it as a torch distribution(add type guard thing whatever it's called :Type)
         return a, {}
     
     def _det_action(self,env_obs):

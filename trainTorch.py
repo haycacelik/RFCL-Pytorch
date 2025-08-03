@@ -17,8 +17,10 @@ import numpy as np
 #import optax
 from omegaconf import OmegaConf
 
+
+
 from rfclTorch.agents.sac import SAC, ActorCritic, SACConfig#todo
-from rfclTorch.agents.sac.networks import DiagGaussianActor,Critic,Temperature#todo
+from rfclTorch.agents.sac.networks import DiagGaussianActor,Critic,Temperature,GaussianPolicy#todo
 from rfclTorch.data.dataset import ReplayDataset, get_states_dataset#done for now
 from rfclTorch.envs.make_env import EnvConfig, get_initial_state_wrapper, make_env_from_cfg# should work
 from rfclTorch.envs.wrappers.curriculum import ReverseCurriculumWrapper#should work?
@@ -201,6 +203,7 @@ def main(cfg: SACExperiment):
             start_step_sampler=cfg.train.start_step_sampler,
         )
         link_envs = [eval_env]
+        
     env = ReverseCurriculumWrapper(
         env,
         states_dataset=states_dataset,
@@ -226,11 +229,11 @@ def main(cfg: SACExperiment):
 #should work till here without many changes, independant of Jax
 
     def create_ac_model():
-        actor = DiagGaussianActor(
+        actor = GaussianPolicy(
             feature_extractor=build_network_from_cfg(cfg.network.actor),
             act_dims=act_dims,
             in_dims=cfg.network.actor.arch_cfg["features"][-1],
-            state_dependent_std=True,
+            #state_dependent_std=True,
         )
         
         critic = Critic(

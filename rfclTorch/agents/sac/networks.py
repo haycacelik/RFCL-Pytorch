@@ -10,6 +10,8 @@ import copy
 import numpy as np
 import torch
 import torch.nn as nn
+import torch.nn.functional as F
+from torch.distributions import Normal
 import math
 # import flax
 # import flax.linen as nn
@@ -24,6 +26,15 @@ import math
 from rfclTorch.agents.sac.config import TimeStep
 
 
+LOG_SIG_MAX = 2
+LOG_SIG_MIN = -20
+epsilon = 1e-6
+
+def weights_init_(m):
+    if isinstance(m, nn.Linear):
+        torch.nn.init.xavier_uniform_(m.weight, gain=1)
+        torch.nn.init.constant_(m.bias, 0)
+        
 # Chatgpt wrote this, idk if works properly
 class TanhTransform(torch.distributions.Transform):
     domain = torch.distributions.constraints.real
@@ -95,6 +106,65 @@ class Critic(nn.Module):
 #to do check where this is called?
 def default_init(scale: Optional[float] = np.sqrt(2)):
     return nn.initializers.orthogonal(scale)
+
+
+
+
+class GaussianPolicy(nn.Module):
+    def __init__(self, feature_extractor: nn.Module, 
+                 act_dims:int,
+                 in_dims: int,
+                #  num_actions, 
+                #  hidden_dim, 
+                 action_space=None):
+        super(GaussianPolicy, self).__init__()
+        
+        self.feature_extractor=feature_extractor
+        #self.linear1 = nn.Linear(num_inputs, hidden_dim)
+        #self.linear2 = nn.Linear(hidden_dim, hidden_dim)
+
+        self.mean_linear = nn.Linear(in_dims, act_dims)
+        self.log_std_linear = nn.Linear(in_dims, act_dims)
+
+        self.apply(weights_init_)
+
+        # action rescaling
+        if action_space is None:
+            self.action_scale = torch.tensor(1.)
+            self.action_bias = torch.tensor(0.)
+        else:
+            self.action_scale = torch.FloatTensor(
+                (action_space.high - action_space.low) / 2.)
+            self.action_bias = torch.FloatTensor(
+                (action_space.high + action_space.low) / 2.)
+
+    def forward(self, state):
+        x = self.feature_extractor(state)
+        mean = self.mean_linear(x)
+        log_std = self.log_std_linear(x)
+        log_std = torch.clamp(log_std, min=LOG_SIG_MIN, max=LOG_SIG_MAX)
+        return mean, log_std
+
+    def sample(self, state):
+        mean, log_std = self.forward(state)
+        std = log_std.exp()
+        normal = Normal(mean, std)
+        x_t = normal.rsample()  # for reparameterization trick (mean + std * N(0,1))
+        y_t = torch.tanh(x_t)
+        action = y_t * self.action_scale + self.action_bias
+        log_prob = normal.log_prob(x_t)
+        # Enforcing Action Bound
+        log_prob -= torch.log(self.action_scale * (1 - y_t.pow(2)) + epsilon)
+        log_prob = log_prob.sum(1, keepdim=True)
+        mean = torch.tanh(mean) * self.action_scale + self.action_bias
+        return action, log_prob, mean
+
+    def to(self, device):
+        self.action_scale = self.action_scale.to(device)
+        self.action_bias = self.action_bias.to(device)
+        return super(GaussianPolicy, self).to(device)
+
+
 
 
 class DiagGaussianActor(nn.Module):
@@ -219,12 +289,18 @@ class ActorCritic(nn.Module):
             obs = torch.tensor(obs,device=self.device,dtype=torch.float32)
         """Sample actions deterministicly"""
         
-        return self.actor(obs, deterministic=deterministic)
+        act,logProb,mean = self.actor.sample(obs)
+        
+        if deterministic:
+            return mean
+        
+        else:
+            return act #double check
 
 
     def sample(self, obs):
         """Sample actions from distribution"""
-        return self.actor(obs).sample()
+        return self.actor.sample(obs)[0]
 
 
     def save(self, save_path: str):
@@ -253,8 +329,8 @@ class ActorCritic(nn.Module):
         
         with torch.no_grad():
             dist = self.actor(batch_next_obs)
-            next_actions = dist.sample()
-            next_log_probs = dist.log_prob(next_actions)
+            next_actions,next_log_probs,_ = self.actor.sample(batch_next_obs)
+    
         
             randomTargetsCritic =  self.target_critic.sample(numSample)
             nextQs = [mod(batch_next_obs,next_actions) for mod in randomTargetsCritic]
@@ -271,9 +347,9 @@ class ActorCritic(nn.Module):
         
           
         Qs = self.critic(batch_env_obs,batch_action)  
-        print(f"Qs: {Qs.shape}")
+        #print(f"Qs: {Qs.shape}")
         targetQ = targetQ.unsqueeze(0).expand_as(Qs)
-        print(f"targetQ")
+        #print(f"targetQ")
         loss = self.criticLoss(Qs,targetQ)
         loss.backward()
         self.critic_optim.step()
@@ -285,10 +361,8 @@ class ActorCritic(nn.Module):
         
         batch_env_obs = torch.tensor(batch.env_obs,device=self.device,dtype=torch.float32)
         self.actor_optim.zero_grad()
-        dist = self.act(batch_env_obs)
-        actions = dist.sample()
-        #print(f"action dim:{actions.shape}")
-        log_probs = dist.log_prob(actions)
+        actions,log_probs,_ = self.actor.sample(batch_env_obs)
+       
         Qs = self.critic(batch_env_obs,actions)
         Q = torch.mean(Qs,dim=0)
         #print(f"Q shape:{Q.shape}")
