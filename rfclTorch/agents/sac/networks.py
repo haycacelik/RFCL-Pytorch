@@ -27,12 +27,12 @@ from rfclTorch.agents.sac.config import TimeStep
 
 
 LOG_SIG_MAX = 2
-LOG_SIG_MIN = -20
+LOG_SIG_MIN = -5
 epsilon = 1e-6
 
 def weights_init_(m):
     if isinstance(m, nn.Linear):
-        torch.nn.init.xavier_uniform_(m.weight, gain=1)
+        nn.init.orthogonal_(m.weight, gain=1)
         torch.nn.init.constant_(m.bias, 0)
         
 # Chatgpt wrote this, idk if works properly
@@ -142,7 +142,7 @@ class GaussianPolicy(nn.Module):
         x = self.feature_extractor(state)
         mean = self.mean_linear(x)
         log_std = self.log_std_linear(x)
-        log_std = torch.clamp(log_std, min=LOG_SIG_MIN, max=LOG_SIG_MAX)
+        log_std = LOG_SIG_MIN + 0.5 * (LOG_SIG_MAX - LOG_SIG_MIN) * (log_std + 1)
         return mean, log_std
 
     def sample(self, state):
