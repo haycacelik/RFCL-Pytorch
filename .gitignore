@@ -116,3 +116,10 @@ $RECYCLE.BIN/
 # Optional: Weights & Biases (if used)
 # -------------------------------
 wandb/
+
+
+*.mp4
+*.jx
+*.err
+*.out
+*tfevents.*

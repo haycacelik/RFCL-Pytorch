@@ -1,0 +1,389 @@
+"""
+Models for SAC
+"""
+import os
+from functools import partial
+from pathlib import Path
+from typing import Callable, Optional, Tuple, Type
+import random
+import copy
+import numpy as np
+import torch
+import torch.nn as nn
+import torch.nn.functional as F
+from torch.distributions import Normal
+import math
+# import flax
+# import flax.linen as nn
+# import jax
+# import jax.numpy as jnp
+# import optax
+# from chex import Array, PRNGKey
+# from flax import struct
+#from tensorflow_probability.substrates import jax as tfp
+
+
+from rfclTorch.agents.sac.config import TimeStep
+
+
+LOG_SIG_MAX = 2
+LOG_SIG_MIN = -5
+epsilon = 1e-6
+
+def weights_init_(m):
+    if isinstance(m, nn.Linear):
+        nn.init.orthogonal_(m.weight, gain=1)
+        torch.nn.init.constant_(m.bias, 0)
+        
+# Chatgpt wrote this, idk if works properly
+class TanhTransform(torch.distributions.Transform):
+    domain = torch.distributions.constraints.real
+    codomain = torch.distributions.constraints.interval(-1.0, 1.0)
+    bijective = True
+    sign = +1
+
+    def __init__(self, cache_size=1):
+        super().__init__(cache_size=cache_size)
+
+    def __eq__(self, other):
+        return isinstance(other, TanhTransform)
+
+    def _call(self, x):
+        # Forward transform: tanh
+        return torch.tanh(x)
+
+    def _inverse(self, y):
+        # Inverse transform: arctanh
+        # Clamp input to avoid numerical issues outside (-1, 1)
+        y = y.clamp(min=-0.9999999, max=0.9999999)
+        return 0.5 * (torch.log1p(y) - torch.log1p(-y))
+    
+
+    def log_abs_det_jacobian(self, x, y):
+        # Jacobian of tanh is 1 - tanh(x)^2 = 1 - y^2
+        #return 2.0 * (math.log(2) - x - torch.nn.functional.softplus(-2.0 * x))
+        # Alternative simpler:
+        return 2.0 * (math.log(2.0) - torch.abs(x) - torch.nn.functional.softplus(-2.0 * torch.abs(x)))
+#what does this even do? Made basic changes
+#less efficient than JAX version, improve later
+
+
+class Ensemble(nn.Module):
+
+    def __init__(self,mod:nn.Module,num:int):
+        super().__init__()
+        self.module = mod
+        self.ensemble = nn.ModuleList([copy.deepcopy(self.module) for i in range(num)])
+        self.num = num
+        
+    def forward(self, *args):
+        out = [mod(*args) for mod in self.ensemble]
+        return torch.stack(out,dim=0)
+    
+    def sample(self,numSample:int):
+        return random.sample(list(self.ensemble),numSample)
+    
+        
+
+
+class Critic(nn.Module):
+    
+    def __init__(self,feature_extractor:nn.Module, 
+                 in_dims: int
+        ):
+        super().__init__()
+        self.feature_extractor=feature_extractor
+        self.fc = nn.Linear(in_dims,1)
+
+    #maybe have np array as input and to tensor()?
+    def forward(self, obs: torch.Tensor, acts: torch.Tensor) -> torch.Tensor:
+        x = torch.cat([obs, acts],dim= -1)
+        features = self.feature_extractor(x)
+        value = self.fc(features)
+        return value.squeeze(-1)
+
+
+#to do check where this is called?
+def default_init(scale: Optional[float] = np.sqrt(2)):
+    return nn.initializers.orthogonal(scale)
+
+
+
+
+class GaussianPolicy(nn.Module):
+    def __init__(self, feature_extractor: nn.Module, 
+                 act_dims:int,
+                 in_dims: int,
+                #  num_actions, 
+                #  hidden_dim, 
+                 action_space=None):
+        super(GaussianPolicy, self).__init__()
+        
+        self.feature_extractor=feature_extractor
+        #self.linear1 = nn.Linear(num_inputs, hidden_dim)
+        #self.linear2 = nn.Linear(hidden_dim, hidden_dim)
+
+        self.mean_linear = nn.Linear(in_dims, act_dims)
+        self.log_std_linear = nn.Linear(in_dims, act_dims)
+
+        self.apply(weights_init_)
+
+        # action rescaling
+        if action_space is None:
+            self.action_scale = torch.tensor(1.)
+            self.action_bias = torch.tensor(0.)
+        else:
+            self.action_scale = torch.FloatTensor(
+                (action_space.high - action_space.low) / 2.)
+            self.action_bias = torch.FloatTensor(
+                (action_space.high + action_space.low) / 2.)
+
+    def forward(self, state):
+        x = self.feature_extractor(state)
+        mean = self.mean_linear(x)
+        log_std = self.log_std_linear(x)
+        log_std = LOG_SIG_MIN + 0.5 * (LOG_SIG_MAX - LOG_SIG_MIN) * (log_std + 1)
+        return mean, log_std
+
+    def sample(self, state):
+        mean, log_std = self.forward(state)
+        std = log_std.exp()
+        normal = Normal(mean, std)
+        x_t = normal.rsample()  # for reparameterization trick (mean + std * N(0,1))
+        y_t = torch.tanh(x_t)
+        action = y_t * self.action_scale + self.action_bias
+        log_prob = normal.log_prob(x_t)
+        # Enforcing Action Bound
+        log_prob -= torch.log(self.action_scale * (1 - y_t.pow(2)) + epsilon)
+        log_prob = log_prob.sum(1, keepdim=True)
+        mean = torch.tanh(mean) * self.action_scale + self.action_bias
+        return action, log_prob, mean
+
+    def to(self, device):
+        self.action_scale = self.action_scale.to(device)
+        self.action_bias = self.action_bias.to(device)
+        return super(GaussianPolicy, self).to(device)
+
+
+
+
+class DiagGaussianActor(nn.Module):
+
+    #maybve add data types of input?
+    #currently in_dims are unknwon, maybe state dim? READ THE CODE!
+    def __init__(self,
+                 feature_extractor: nn.Module,
+                 act_dims: int,
+                 in_dims: int,
+                 output_activation = nn.ReLU,
+                 tanh_squash_distribution: bool = True,
+                 state_dependent_std: bool = True,
+                 log_std_range: Tuple[float,float] = (-5.0,2.0)
+        ):
+        super().__init__()
+        
+        self.feature_extractor=feature_extractor
+        self.act_dims=act_dims
+        self.output_activation=output_activation
+        self.tanh_squash_distribution=tanh_squash_distribution
+        self.state_dependent_std=state_dependent_std
+        self.log_std_range=log_std_range
+        self.in_dims = in_dims
+        
+        if self.state_dependent_std:
+            # Add final dense layer initialization scale and orthogonal init
+           # self.log_std = nn.Dense(self.act_dims, kernel_init=default_init(1))
+            #check if some custom init needed, probably not since default was used
+            self.log_std = nn.Linear(self.in_dims,self.act_dims)
+            nn.init.orthogonal_(self.log_std.weight,gain=1.0)
+        else:
+            self.log_std = nn.Parameter(torch.zeros(self.act_dims))
+
+        # scale of orthgonal initialization is recommended to be (high - low) / 2.
+        # We always assume envs use normalized actions [-1, 1] so we init with 1
+        
+        #might require different input dimensions!
+        self.action_head = nn.Linear(self.in_dims,self.act_dims)
+        nn.init.orthogonal_(self.action_head.weight,gain=1.0)
+
+    def forward(self, x, deterministic=False):
+
+        x = self.feature_extractor(x)
+        a = self.action_head(x)
+        
+        #why are their two calls if determinsitc?
+        if not self.tanh_squash_distribution:
+            a = torch.tanh(a)
+        if deterministic:
+            return torch.tanh(a)
+        if self.state_dependent_std:
+            log_std = self.log_std(x)
+            log_std = torch.tanh(log_std)
+        else:
+            log_std = self.log_std
+        log_std = self.log_std_range[0] + 0.5 * (self.log_std_range[1] - self.log_std_range[0]) * (log_std + 1)
+        dist = torch.distributions.Independent(torch.distributions.Normal(loc=a, scale=torch.exp(log_std)),1)
+        # distrax has some numerical imprecision bug atm where calling sample then log_prob can raise NaNs. tfd is more stable at the moment
+        # dist = distrax.MultivariateNormalDiag(a, jnp.exp(log_std))
+        if self.tanh_squash_distribution:
+            # dist = distrax.Transformed(distribution=dist, bijector=distrax.Block(distrax.Tanh(), ndims=1))
+            #dist = tfd.TransformedDistribution(distribution=dist, bijector=tfb.Tanh())
+            dist = torch.distributions.TransformedDistribution(dist,TanhTransform())
+            #torch doesn't have one built in, add this in a later step!0
+        return dist
+
+
+class Temperature(nn.Module):
+
+    def __init__(self,initial_temperature=1.0):
+        super().__init__()
+        self.log_temp = nn.Parameter(torch.log(torch.tensor(initial_temperature)))
+
+    def forward(self):
+        return torch.exp(self.log_temp)
+
+
+
+class ActorCritic(nn.Module):
+
+    
+    def __init__(self,actor:nn. Module,
+                 critic: nn.Module,
+                 target_critic: nn.Module,
+                 temp: nn.Module,
+                 sample_obs: np.array,
+                 sample_acts: np.array,
+                 actor_optim_lr = 3e-4,
+                 critic_optim_lr = 3e-4,
+                 initial_temperature: float = 1.0,
+                 temperature_optim_lr = 3e-4,
+                 num_qs: int=10,
+                 num_min_qs: int =2,
+                 device="cpu"
+    ):
+        super().__init__()
+    # Shoud probably create adam optimizers instead of taking optim inputs in the beginning
+        self.actor=actor
+        self.critic=Ensemble(critic,num_qs)
+        self.target_critic=Ensemble(critic,num_qs)# or num_min_qs)
+        self.target_critic.load_state_dict(self.critic.state_dict())
+        self.temp=temp
+        self.sample_obs=sample_obs
+        self.sample_acts=sample_acts
+        self.actor_optim=torch.optim.Adam(self.actor.parameters(),lr=actor_optim_lr)
+        self.critic_optim=torch.optim.Adam(self.critic.parameters(),lr=critic_optim_lr)
+        self.initial_temperature=initial_temperature
+        self.temperature_optim=torch.optim.Adam(self.temp.parameters(),lr=temperature_optim_lr)
+        self.num_qs=num_qs
+        self.num_min_qs=num_min_qs
+
+        self.device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+        print(f"using device {self.device} ")
+        
+        self.criticLoss = nn.MSELoss()
+        
+        self.to(self.device)
+
+    def act(self, obs, deterministic=False):
+        if not isinstance(obs,torch.Tensor):
+            obs = torch.tensor(obs,device=self.device,dtype=torch.float32)
+        """Sample actions deterministicly"""
+        
+        act,logProb,mean = self.actor.sample(obs)
+        
+        if deterministic:
+            return mean
+        
+        else:
+            return act #double check
+
+
+    def sample(self, obs):
+        """Sample actions from distribution"""
+        return self.actor.sample(obs)[0]
+
+
+    def save(self, save_path: str):
+        Path(os.path.dirname(save_path)).mkdir(parents=True, exist_ok=True)
+        torch.save(self.state_dict(), save_path)
+
+    #changed to not return the actor and critic models as they are now kept in the 
+    # ActorCritic Class
+    def load(self, params_dict):
+        self.load_state_dict(params_dict)
+
+
+    def load_from_path(self, load_path: str, load_critic=True):
+        params_dict = torch.load(load_path, map_location=self.device)  # or "cuda" if needed
+        self.load(params_dict)
+        return self
+    
+    def updateCritic(self, batch: TimeStep, discount: float, backup_entropy: bool, numSample:int):
+        
+        batch_next_obs = torch.tensor(batch.next_env_obs,device=self.device,dtype=torch.float32)
+        batch_reward = torch.tensor(batch.reward,device=self.device,dtype=torch.float32)
+        batch_mask = torch.tensor(batch.mask,device=self.device,dtype=torch.float32)
+        batch_env_obs = torch.tensor(batch.env_obs,device=self.device,dtype=torch.float32)
+        batch_action = torch.tensor(batch.action,device=self.device,dtype=torch.float32)
+        self.critic_optim.zero_grad()
+        
+        with torch.no_grad():
+            dist = self.actor(batch_next_obs)
+            next_actions,next_log_probs,_ = self.actor.sample(batch_next_obs)
+    
+        
+            randomTargetsCritic =  self.target_critic.sample(numSample)
+            nextQs = [mod(batch_next_obs,next_actions) for mod in randomTargetsCritic]
+            nextQs = torch.stack(nextQs,dim=0)
+        #print(f"nextQs: {nextQs.shape}")
+            nextQ,_ = torch.min(nextQs,dim=0)
+        #print(f"nextQ min:{nextQ.shape}")
+            targetQ = batch_reward + discount * batch_mask * nextQ
+        
+
+            if backup_entropy:
+               targetQ -= discount * batch_mask * self.temp() * next_log_probs
+            
+        
+          
+        Qs = self.critic(batch_env_obs,batch_action)  
+        #print(f"Qs: {Qs.shape}")
+        targetQ = targetQ.unsqueeze(0).expand_as(Qs)
+        #print(f"targetQ")
+        loss = self.criticLoss(Qs,targetQ)
+        loss.backward()
+        self.critic_optim.step()
+       #print(f"Qs shape: {Qs.shape}")
+        return loss.item(),Qs.detach().mean()
+        
+
+    def updateActor(self,batch: TimeStep):
+        
+        batch_env_obs = torch.tensor(batch.env_obs,device=self.device,dtype=torch.float32)
+        self.actor_optim.zero_grad()
+        actions,log_probs,_ = self.actor.sample(batch_env_obs)
+       
+        Qs = self.critic(batch_env_obs,actions)
+        Q = torch.mean(Qs,dim=0)
+        #print(f"Q shape:{Q.shape}")
+        #print(f"log_probs shape:{log_probs.shape}")
+        #print(f"Qs shape: {Qs.shape}")
+        #Q = Q.detach()
+        loss = (log_probs * self.temp() - Q).mean()
+        loss.backward()
+        self.actor_optim.step()
+        #print(f"actor_loss: {loss.item()}, entropy:{-log_probs.mean().item()}")
+        return loss.item(),-log_probs.mean().detach().item()
+        
+    def updateTemp(self,entropy: float, target_entropy:float):
+        self.temperature_optim.zero_grad()
+        temperature = self.temp()
+        loss = temperature * (entropy - target_entropy)
+        loss.backward()
+        self.temperature_optim.step()
+        return loss.item(),temperature
+        
+    def updateTarget(self, tau:float):
+         for target_param, main_param in zip(self.target_critic.parameters(), self.critic.parameters()):
+            target_param.data.copy_(tau * main_param.data + (1.0 - tau) * target_param.data)
+        

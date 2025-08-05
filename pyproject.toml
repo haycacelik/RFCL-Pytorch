@@ -11,7 +11,7 @@ readme = "README.md"
 requires-python = ">= 3.8"
 authors = [{ name = "Anon", email = "anonresearchrl@gmail.com" }]
 license = { text = "MIT License" }
-keywords = ["Reinforcement Learning", "Robotics", "Jax", "RL", "AI"]
+keywords = ["Reinforcement Learning", "Robotics", "RL", "AI"]
 classifiers = [
     "Development Status :: 4 - Beta",  # change to `5 - Production/Stable` when ready
     "License :: OSI Approved :: MIT License",
@@ -24,18 +24,14 @@ classifiers = [
     'Topic :: Scientific/Engineering :: Artificial Intelligence',
 ]
 dependencies = [
+    "torch",
+
     "numpy >=1.22.0",
     "scipy",
 
     # RL
     "gymnasium==0.29.1",
-    "gymnax",
 
-    # Jax Related
-    "chex",
-    "distrax",
-    "flax",
-    "optax",
 
     # Video generation
     "moviepy",
@@ -62,8 +58,7 @@ dynamic = ["version"]
 
 mani-skill2 = ["mani_skill2"]
 dm-control = ["dm_control"]
-brax = ["brax", "gymnax"]
-gymnax = ["gymnax"]
+
 
 dev = ["ipdb", "jupyterlab", "ipython", "black", "isort"]
 
