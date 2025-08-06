@@ -1,3 +1,6 @@
+# Please switch to branch 'final' for the submission code.
+
+
 # RFCL: Reverse Forward Curriculum Learning (ICLR 2024)
 
 Official repository for the RFCL algorithm by
